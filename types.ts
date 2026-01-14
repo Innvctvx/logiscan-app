@@ -13,18 +13,39 @@ export type DocType = 'EMBARQUE' | 'REMISIÓN';
 
 export type RecordStatus = 'PENDIENTE' | 'VERIFICADO';
 
+export type RecordCategory = 'SCAN' | 'CARTA_PORTE';
+
 export interface ScanRecord {
   id: string;
   timestamp: number;
   verifiedAt?: number;
   status: RecordStatus;
-  docType: DocType;      // Col: 1/EMBARQUE
-  docNumber: string;     // Col: No. Documento
-  bultos: string;        // Col: No. Bultos
-  storeLabel: string;    // Col: No. Alm (e.g., C&C 880)
-  destination: string;   // Col: Nombre Alm. Destino (Fixed: PAQUETERÍA)
-  huCode: string;        // Col: No. Contenedor (HU) -> The LP
-  providerCode: string;  // Col: Razon social -> The Container (Q...)
+  recordCategory: RecordCategory; // New field to distinguish type
+  
+  // Fields for Scanning
+  docType?: DocType;
+  docNumber?: string;
+  bultos?: string;
+  storeLabel: string;
+  destination: string;
+  huCode?: string;        // LP or Paquete
+  providerCode?: string;  // Container or Proveedor
+
+  // Fields for Carta Porte
+  cp_rfcOperador?: string;
+  cp_licencia?: string;
+  cp_operador?: string;
+  cp_numEconomico?: string;
+  cp_confVehic?: string;
+  cp_placa?: string;
+  cp_ano?: string;
+  cp_poliza?: string;
+  cp_seguro?: string;
+  cp_peso?: string;
+  
+  // New Fields for Foraneo Provider
+  cp_distribuidora?: string;
+  cp_proveedorNum?: string;
 }
 
 export const STORE_NAMES: Record<string, string> = {
