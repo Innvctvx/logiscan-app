@@ -9,7 +9,7 @@ import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, UserCircle, LogOut,
 // --- CONFIGURACIÓN HARDCODED (SIN LOGIN) ---
 // Pega aquí tu URL de Web App de Google Apps Script (debe terminar en /exec)
 // Ejemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
-const GOOGLE_SCRIPT_URL = ""; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUHQlg1j9bnLaDMSeCHvVtLq4UOUYoItqtXJCfm6mQjSFdtKTNKnsWUv0j09nTwn4G/exec"; 
 
 declare global {
   interface Window {
