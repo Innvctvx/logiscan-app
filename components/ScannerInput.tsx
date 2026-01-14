@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Scan, Plus, Trash2, Camera, X } from 'lucide-react';
+import { Scan, Plus, Trash2, Camera, X, AlertCircle } from 'lucide-react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 interface ScannerInputProps {
@@ -19,6 +19,13 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+
+  // Determine what we expect next
+  const expectingContainer = currentCodes.length === 0;
+  const hintText = expectingContainer 
+    ? "Escanea el CONTENEDOR Principal" 
+    : "Escanea los PAQUETES (HU)";
+  const hintColor = expectingContainer ? "text-blue-600" : "text-indigo-600";
 
   // Auto-focus input on mount and after interactions (unless scanning)
   useEffect(() => {
@@ -94,12 +101,15 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
   return (
     <>
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-2">
             <div className="bg-blue-100 p-2 rounded-lg">
               <Scan className="w-5 h-5 text-blue-600" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-800">Escaneo de Códigos</h2>
+            <div>
+               <h2 className="text-lg font-semibold text-slate-800 leading-none">Escáner</h2>
+               <p className={`text-xs font-bold mt-1 ${hintColor}`}>{hintText}</p>
+            </div>
           </div>
           
           <button
@@ -107,7 +117,7 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
             className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
           >
             <Camera className="w-4 h-4" />
-            <span className="hidden sm:inline">Usar Cámara</span>
+            <span className="hidden sm:inline">Cámara</span>
           </button>
         </div>
 
@@ -118,8 +128,8 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Escribir código manual..."
-            className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-lg font-mono"
+            placeholder={expectingContainer ? "Código Contenedor..." : "Código Paquete..."}
+            className={`w-full pl-4 pr-12 py-3 bg-slate-50 border rounded-lg focus:ring-2 outline-none transition-all text-lg font-mono ${expectingContainer ? 'border-blue-300 focus:border-blue-500 focus:ring-blue-500' : 'border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500'}`}
           />
           <button 
             onClick={() => {
@@ -138,30 +148,35 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
         {/* Staging Area Display */}
         <div className="space-y-2">
           <div className="flex justify-between items-center text-sm text-slate-500 mb-2">
-            <span>Códigos en grupo actual: {currentCodes.length}</span>
+            <span>En grupo actual: {currentCodes.length}</span>
             {currentCodes.length > 0 && (
               <button 
                 onClick={onClear}
                 className="text-red-500 hover:text-red-600 flex items-center gap-1 text-xs font-medium"
               >
-                <Trash2 className="w-3 h-3" /> Limpiar Todo
+                <Trash2 className="w-3 h-3" /> Limpiar
               </button>
             )}
           </div>
           
           {currentCodes.length === 0 ? (
-            <div className="p-6 border-2 border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-400">
-              <span className="text-sm">Escanea el primer código (Contenedor)</span>
+            <div className="p-6 border-2 border-dashed border-slate-200 rounded-lg flex flex-col items-center justify-center text-slate-400 bg-slate-50/50">
+              <AlertCircle className="w-8 h-8 mb-2 opacity-50" />
+              <span className="text-sm font-medium">Listo para iniciar grupo</span>
+              <span className="text-xs">Escanea el Contenedor Principal</span>
             </div>
           ) : (
-            <div className="bg-slate-50 rounded-lg p-2 max-h-48 overflow-y-auto space-y-2">
+            <div className="bg-slate-50 rounded-lg p-2 max-h-48 overflow-y-auto space-y-2 border border-slate-200">
               {currentCodes.map((code, idx) => (
                 <div key={`${code}-${idx}`} className="flex items-center justify-between bg-white p-3 rounded shadow-sm border border-slate-200 animate-fadeIn">
                   <div className="flex items-center gap-3">
-                    <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${idx === 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>
-                      {idx === 0 ? 'C' : 'LP'}
+                    <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${idx === 0 ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-indigo-100 text-indigo-700 border border-indigo-200'}`}>
+                      {idx === 0 ? 'C' : 'P'}
                     </span>
-                    <span className="font-mono font-medium text-slate-700">{code}</span>
+                    <div className="flex flex-col">
+                        <span className="font-mono font-bold text-slate-800 leading-none">{code}</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">{idx === 0 ? 'Contenedor' : 'Paquete'}</span>
+                    </div>
                   </div>
                   <button 
                     onClick={() => onRemoveCode(idx)}
@@ -193,25 +208,15 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
               </button>
             </div>
             
-            {/* 
-              Changed bg-black to bg-white so default library text is visible.
-              Added overflow-y-auto to allow scrolling if UI is tall.
-            */}
             <div className="flex-1 bg-white p-2 flex flex-col overflow-y-auto min-h-[400px]">
               <div id="reader" className="w-full"></div>
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 shrink-0">
-              <p className="text-sm text-center text-slate-600 mb-2">
-                Apunta la cámara al código.
+            <div className="p-4 bg-slate-50 border-t border-slate-200 shrink-0 text-center">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Siguiente escaneo:</p>
+              <p className={`text-lg font-bold ${expectingContainer ? 'text-blue-600' : 'text-indigo-600'}`}>
+                  {expectingContainer ? "CONTENEDOR" : "PAQUETES"}
               </p>
-              <div className="flex flex-wrap gap-2 justify-center max-h-24 overflow-y-auto">
-                {currentCodes.map((code, idx) => (
-                  <span key={idx} className={`text-xs px-2 py-1 rounded font-mono ${idx === 0 ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-white border border-slate-200 text-slate-600'}`}>
-                    {code}
-                  </span>
-                ))}
-              </div>
             </div>
           </div>
         </div>
