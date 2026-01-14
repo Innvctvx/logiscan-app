@@ -6,6 +6,11 @@ import { CartaPorteForm } from './components/CartaPorteForm';
 import { ScanRecord, ServiceType, DocType, Region, GoogleUser, RecordCategory } from './types';
 import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, UserCircle, LogOut, Settings, Truck, AlertTriangle, Code } from 'lucide-react';
 
+// --- CONFIGURACIÓN HARDCODED (SIN LOGIN) ---
+// Pega aquí tu URL de Web App de Google Apps Script (debe terminar en /exec)
+// Ejemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
+const GOOGLE_SCRIPT_URL = ""; 
+
 declare global {
   interface Window {
     google: any;
@@ -53,7 +58,9 @@ const App: React.FC = () => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [tokenClient, setTokenClient] = useState<any>(null);
   const [clientId, setClientId] = useState<string>('');
-  const [masterSheetId, setMasterSheetId] = useState<string>('');
+  
+  // Initialize masterSheetId with the hardcoded URL if available
+  const [masterSheetId, setMasterSheetId] = useState<string>(GOOGLE_SCRIPT_URL);
 
   // Initialize Logic
   useEffect(() => {
@@ -61,21 +68,32 @@ const App: React.FC = () => {
     const savedClientId = localStorage.getItem('logiscan_client_id');
     if (savedClientId) setClientId(savedClientId);
     
-    const savedSheetId = localStorage.getItem('logiscan_master_sheet_id');
-    if (savedSheetId) setMasterSheetId(savedSheetId);
+    // Only load from localStorage if we haven't hardcoded the URL
+    if (!GOOGLE_SCRIPT_URL) {
+      const savedSheetId = localStorage.getItem('logiscan_master_sheet_id');
+      if (savedSheetId) setMasterSheetId(savedSheetId);
+    }
 
-    // Init Google
-    const initClient = () => {
-      if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-        console.log("Google Identity Services loaded");
-      } else {
-        setTimeout(initClient, 500);
-      }
-    };
-    initClient();
+    // Init Google (Only needed if NOT using hardcoded URL)
+    if (!GOOGLE_SCRIPT_URL) {
+      const initClient = () => {
+        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+          console.log("Google Identity Services loaded");
+        } else {
+          setTimeout(initClient, 500);
+        }
+      };
+      initClient();
+    }
   }, []);
 
   const handleSettings = () => {
+    // If hardcoded, alert the user instead of letting them change it easily
+    if (GOOGLE_SCRIPT_URL) {
+      alert("⚠️ MODO AUTOMÁTICO ACTIVO ⚠️\n\nEl sistema está configurado internamente para sincronizar con la hoja central.\n\nNo es necesario configurar nada.");
+      return;
+    }
+
     const input = prompt(
       "CONFIGURACIÓN DE CONEXIÓN\n\n" +
       "OPCIÓN A (Sin Login):\nPega la URL de la Web App de Apps Script.\n\n" +
@@ -277,8 +295,9 @@ const App: React.FC = () => {
   }, [rfcOperador, licencia, operadorName, numEconomico, confVehic, placa, ano, poliza, seguro, peso, distribuidora, proveedorNum, serviceType, region]);
 
   const isScriptMode = masterSheetId.startsWith('https://');
-  const showLoginButton = !isScriptMode && !user;
-  const showUserMenu = !isScriptMode && user;
+  // If we have a hardcoded URL, we never show the login button
+  const showLoginButton = !GOOGLE_SCRIPT_URL && !isScriptMode && !user;
+  const showUserMenu = !GOOGLE_SCRIPT_URL && !isScriptMode && user;
 
   // Header Color Logic
   const getHeaderColor = () => {
