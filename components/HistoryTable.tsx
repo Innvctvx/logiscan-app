@@ -33,14 +33,20 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
     try {
       // 1. Prepare Data
       const groupedData: Record<string, any[]> = {};
+      const storeCounters: Record<string, number> = {};
       
       records.forEach(r => {
         const match = r.storeLabel.match(/(\d+)/);
         const storeNum = match ? match[0] : 'Otros';
+        
         if (!groupedData[storeNum]) groupedData[storeNum] = [];
+        if (!storeCounters[storeNum]) storeCounters[storeNum] = 1;
+
+        const consecutivo = storeCounters[storeNum]++;
 
         if (r.recordCategory === 'CARTA_PORTE') {
            groupedData[storeNum].push([
+             consecutivo, // Column A: Sequential Number
              'CARTA PORTE',
              r.cp_rfcOperador || '',
              r.cp_licencia || '',
@@ -58,8 +64,8 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
            ]);
         } else {
           groupedData[storeNum].push([
-            '',
-            `1 ${r.docType}`,
+            consecutivo, // Column A: Sequential Number
+            r.docType || '', // Column B: Doc Type (EMBARQUE/REMISION)
             r.docNumber,
             r.bultos,
             r.storeLabel,
@@ -118,9 +124,15 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
     [...targetStores, 'Otros'].forEach(storeNum => {
       const storeRecords = groupedData[storeNum];
       if (storeRecords && storeRecords.length > 0) {
-        const excelRows = storeRecords.map((r, index) => {
+        // Sort by timestamp (already done usually)
+        let counter = 1;
+
+        const excelRows = storeRecords.map((r) => {
+          const consecutivo = counter++;
+
           if (r.recordCategory === 'CARTA_PORTE') {
             return {
+              "No.": consecutivo,
               "Tipo": "CARTA PORTE",
               "RFC Operador": r.cp_rfcOperador,
               "Licencia": r.cp_licencia,
@@ -138,8 +150,8 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
             };
           } else {
              return {
-              "Tipo": "ESCANAEO",
-              "No. Manifiesto": `1 ${r.docType}`,
+              "No.": consecutivo,
+              "Tipo Doc": r.docType,
               "No. Documento": r.docNumber,
               "Bultos": r.bultos,
               "Almacen": r.storeLabel,
