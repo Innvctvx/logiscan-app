@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScanRecord, STORE_NAMES, RecordCategory } from '../types';
-import { FileSpreadsheet, CheckCircle2, Circle, Clock, Download, CloudUpload, Loader2, Lock, Link as LinkIcon, Zap, Truck, Box } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2, Circle, Clock, Download, CloudUpload, Loader2, Lock, Link as LinkIcon, Zap, Truck, Box, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface HistoryTableProps {
@@ -13,6 +13,7 @@ interface HistoryTableProps {
 export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken, onLoginRequest, masterSheetId }) => {
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Check if we have a valid Web App URL
   const isScriptMode = masterSheetId && masterSheetId.startsWith('https://');
 
   const formatDateTime = (ts: number) => {
@@ -30,6 +31,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
     setIsSyncing(true);
 
     try {
+      // 1. Prepare Data
       const groupedData: Record<string, any[]> = {};
       
       records.forEach(r => {
@@ -71,28 +73,30 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
         }
       });
 
+      // 2. Send Data via WebHook (Preferred Method)
       if (isScriptMode) {
         await fetch(masterSheetId, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(groupedData)
         });
-        alert("✅ Datos sincronizados correctamente.");
+        alert("✅ Datos sincronizados correctamente a la Hoja Central.");
         setIsSyncing(false);
         return;
       }
 
-      if (!accessToken) {
-        setIsSyncing(false);
-        onLoginRequest();
-        return;
-      }
-      alert("Por favor usa el modo Auto-Sync.");
+      // 3. Fallback / Error if no URL is configured
+      setIsSyncing(false);
+      alert(
+        "⚠️ Faltan Ajustes de Conexión ⚠️\n\n" +
+        "El sistema no encuentra la URL del Script de Google.\n\n" +
+        "1. Abre el archivo App.tsx y pega la URL en 'GOOGLE_SCRIPT_URL'.\n" +
+        "2. O toca el botón de engranaje (⚙️) y pégala ahí."
+      );
 
     } catch (error) {
       console.error("Sync Error", error);
-      alert("Error al sincronizar.");
-    } finally {
+      alert("❌ Error de red o de servidor. Intenta de nuevo.");
       setIsSyncing(false);
     }
   };
@@ -175,7 +179,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50 ${isScriptMode ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-slate-700 text-white'}`}
               >
                 {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <CloudUpload className="w-3 h-3" />}
-                Sync
+                {isScriptMode ? 'Sync Central' : 'Sync'}
               </button>
               <button onClick={handleExport} className="bg-slate-100 p-1.5 rounded-lg border border-slate-200 hover:bg-slate-200"><Download className="w-4 h-4 text-slate-600" /></button>
             </>
@@ -199,7 +203,21 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
           </thead>
           <tbody className="divide-y divide-slate-100">
             {records.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-300 font-medium">Sin datos registrados</td></tr>
+              <tr>
+                <td colSpan={5} className="px-4 py-12 text-center text-slate-300 font-medium">
+                  {isScriptMode ? (
+                     <span className="flex flex-col items-center gap-2">
+                       <CheckCircle2 className="w-8 h-8 text-emerald-400 opacity-50" />
+                       Conectado a Hoja Central. Listo para escanear.
+                     </span>
+                  ) : (
+                     <span className="flex flex-col items-center gap-2">
+                       <AlertTriangle className="w-8 h-8 text-amber-400 opacity-50" />
+                       Configura la URL para sincronizar.
+                     </span>
+                  )}
+                </td>
+              </tr>
             ) : (
               [...records].sort((a, b) => b.timestamp - a.timestamp).map((record) => (
                 <tr key={record.id} className={`hover:bg-slate-50 transition-colors border-l-[3px] ${record.status === 'VERIFICADO' ? 'border-l-emerald-500 bg-emerald-50/30' : 'border-l-transparent'}`}>
