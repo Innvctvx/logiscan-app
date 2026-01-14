@@ -3,7 +3,7 @@ import { ScannerInput } from './components/ScannerInput';
 import { ControlPanel } from './components/ControlPanel';
 import { HistoryTable } from './components/HistoryTable';
 import { ScanRecord, ServiceType, DocType, Region, GoogleUser } from './types';
-import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, UserCircle, LogOut } from 'lucide-react';
+import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, UserCircle, LogOut, Settings } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -31,20 +31,25 @@ const App: React.FC = () => {
   // Data State
   const [records, setRecords] = useState<ScanRecord[]>([]);
 
-  // --- GOOGLE AUTH STATE ---
+  // --- GOOGLE AUTH & SETTINGS STATE ---
   const [user, setUser] = useState<GoogleUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [tokenClient, setTokenClient] = useState<any>(null);
   const [clientId, setClientId] = useState<string>('');
+  const [masterSheetId, setMasterSheetId] = useState<string>('');
 
-  // Initialize Google Token Client
+  // Initialize Logic
   useEffect(() => {
+    // Load Settings
     const savedClientId = localStorage.getItem('logiscan_client_id');
     if (savedClientId) setClientId(savedClientId);
+    
+    const savedSheetId = localStorage.getItem('logiscan_master_sheet_id');
+    if (savedSheetId) setMasterSheetId(savedSheetId);
 
+    // Init Google
     const initClient = () => {
       if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-        // We defer client creation until we click login to ensure ClientID is present
         console.log("Google Identity Services loaded");
       } else {
         setTimeout(initClient, 500);
@@ -52,6 +57,27 @@ const App: React.FC = () => {
     };
     initClient();
   }, []);
+
+  const handleSettings = () => {
+    const newSheetId = prompt(
+      "Configuración de Hoja Maestra (Opcional)\n\n" +
+      "Si quieres que TODOS los datos vayan a una sola hoja de cálculo tuya:\n" +
+      "1. Crea una hoja en Google Sheets.\n" +
+      "2. Compártela con los correos de tus empleados (Permiso Editor).\n" +
+      "3. Copia el ID de la URL (la parte larga entre /d/ y /edit).\n" +
+      "4. Pégalo aquí.\n\n" +
+      "ID Actual:", 
+      masterSheetId
+    );
+
+    if (newSheetId !== null) {
+      const cleanId = newSheetId.trim();
+      setMasterSheetId(cleanId);
+      localStorage.setItem('logiscan_master_sheet_id', cleanId);
+      if(cleanId) alert("✅ Hoja Maestra configurada. Todos los datos irán ahí.");
+      else alert("🗑️ Configuración borrada. Se crearán hojas nuevas por día.");
+    }
+  };
 
   const handleLogin = () => {
     let currentClientId = clientId;
@@ -149,9 +175,15 @@ const App: React.FC = () => {
       });
       setActiveCodes([]); 
     } else {
-      // REGISTRATION MODE
+      // REGISTRATION MODE (FLEXIBLE)
       setActiveCodes(prev => {
-        if (prev.includes(code)) return prev;
+        // 1. Check Duplicates
+        if (prev.includes(code)) {
+          return prev;
+        }
+
+        // 2. Add Code (No strict Q/0 check)
+        playSuccessSound();
         if (prev.length >= 20) return prev; 
         return [...prev, code];
       });
@@ -229,6 +261,15 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Settings Button */}
+              <button 
+                onClick={handleSettings}
+                className={`p-2 rounded-lg transition-colors ${appMode === 'VERIFY' ? 'text-indigo-200 hover:text-white hover:bg-indigo-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                title="Configuración de Hoja Maestra"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+
               {/* Google Login / User Profile */}
               {!user ? (
                 <button 
@@ -240,7 +281,7 @@ const App: React.FC = () => {
                   }`}
                 >
                   <LogIn className="w-4 h-4" />
-                  <span className="hidden sm:inline">Conectar Google</span>
+                  <span className="hidden sm:inline">Conectar</span>
                 </button>
               ) : (
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
@@ -337,8 +378,8 @@ const App: React.FC = () => {
                   <div className="bg-yellow-50 border border-yellow-100 p-3 rounded-lg text-xs text-yellow-800">
                     <p className="font-bold mb-1">Nota de Registro:</p>
                     <ul className="list-disc list-inside opacity-90">
-                      <li>El primer código es el <strong>Proveedor (Contenedor)</strong>.</li>
-                      <li>Los siguientes códigos son <strong>HU (Paquetes)</strong>.</li>
+                      <li>El primer código será el <strong>Contenedor / Proveedor</strong>.</li>
+                      <li>Los siguientes códigos serán los <strong>Paquetes (HU)</strong>.</li>
                     </ul>
                   </div>
                 </>
@@ -347,7 +388,12 @@ const App: React.FC = () => {
           </div>
 
           <div className="lg:col-span-8">
-            <HistoryTable records={records} accessToken={accessToken} onLoginRequest={handleLogin} />
+            <HistoryTable 
+              records={records} 
+              accessToken={accessToken} 
+              onLoginRequest={handleLogin} 
+              masterSheetId={masterSheetId}
+            />
           </div>
           
         </div>
