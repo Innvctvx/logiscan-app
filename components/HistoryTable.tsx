@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScanRecord, STORE_NAMES, RecordCategory } from '../types';
-import { FileSpreadsheet, CheckCircle2, Circle, Clock, Download, CloudUpload, Loader2, Lock, Link as LinkIcon, Zap, Truck, Box, AlertTriangle } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2, Circle, Clock, Download, CloudUpload, Loader2, Lock, Link as LinkIcon, Zap, Truck, Box, AlertTriangle, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface HistoryTableProps {
@@ -10,8 +10,11 @@ interface HistoryTableProps {
   masterSheetId: string;
 }
 
+type ViewFilter = 'ALL' | 'SCAN' | 'CARTA_PORTE';
+
 export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken, onLoginRequest, masterSheetId }) => {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [viewFilter, setViewFilter] = useState<ViewFilter>('ALL');
 
   // Check if we have a valid Web App URL
   const isScriptMode = masterSheetId && masterSheetId.startsWith('https://');
@@ -34,26 +37,24 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
       // 1. Prepare Data
       const groupedData: Record<string, any[]> = {};
       const storeCounters: Record<string, number> = {};
+      let cpCounter = 1; // Global counter for Carta Porte tab
       
       records.forEach(r => {
-        const match = r.storeLabel.match(/(\d+)/);
-        const storeNum = match ? match[0] : 'Otros';
+        // Logic: Scans go to Store Tabs (98, 99...), CP goes to 'CARTA PORTE' tab
         
-        if (!groupedData[storeNum]) groupedData[storeNum] = [];
-        if (!storeCounters[storeNum]) storeCounters[storeNum] = 1;
-
-        const consecutivo = storeCounters[storeNum]++;
-
         if (r.recordCategory === 'CARTA_PORTE') {
-           groupedData[storeNum].push([
-             consecutivo, // Column A: Sequential Number
-             'CARTA PORTE',
-             r.cp_rfcOperador || '',
-             r.cp_licencia || '',
-             r.cp_operador || '',
+           const tabName = 'CARTA PORTE';
+           if (!groupedData[tabName]) groupedData[tabName] = [];
+           
+           groupedData[tabName].push([
+             cpCounter++,           // A: Consecutivo Global CP
+             r.storeLabel,          // B: Almacen (Important for context)
+             r.cp_operador || '',   // C: Operador
+             r.cp_rfcOperador || '',// D: RFC
+             r.cp_licencia || '',   // E: Licencia
+             r.cp_placa || '',      // F: Placa
              r.cp_numEconomico || '',
              r.cp_confVehic || '',
-             r.cp_placa || '',
              r.cp_ano || '',
              r.cp_poliza || '',
              r.cp_seguro || '',
@@ -62,7 +63,17 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
              r.cp_proveedorNum || '-',
              formatDateTime(r.timestamp)
            ]);
+
         } else {
+          // Normal Scans Logic
+          const match = r.storeLabel.match(/(\d+)/);
+          const storeNum = match ? match[0] : 'Otros';
+          
+          if (!groupedData[storeNum]) groupedData[storeNum] = [];
+          if (!storeCounters[storeNum]) storeCounters[storeNum] = 1;
+
+          const consecutivo = storeCounters[storeNum]++;
+
           groupedData[storeNum].push([
             consecutivo, // Column A: Sequential Number
             r.docType || '', // Column B: Doc Type (EMBARQUE/REMISION)
@@ -86,7 +97,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(groupedData)
         });
-        alert("✅ Datos sincronizados correctamente a la Hoja Central.");
+        alert("✅ Datos sincronizados correctamente.\n(Se actualizaron las pestañas de Tienda y CARTA PORTE)");
         setIsSyncing(false);
         return;
       }
@@ -112,45 +123,29 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
 
     const wb = XLSX.utils.book_new();
     const targetStores = ['98', '99', '195', '880'];
-    const groupedData: Record<string, ScanRecord[]> = {};
+    
+    // Group Data
+    const groupedScans: Record<string, ScanRecord[]> = {};
+    const cartaPorteRecords: ScanRecord[] = [];
 
     records.forEach(record => {
-      const match = record.storeLabel.match(/(\d+)/);
-      const storeNum = match ? match[0] : 'Otros';
-      if (!groupedData[storeNum]) groupedData[storeNum] = [];
-      groupedData[storeNum].push(record);
+      if (record.recordCategory === 'CARTA_PORTE') {
+        cartaPorteRecords.push(record);
+      } else {
+        const match = record.storeLabel.match(/(\d+)/);
+        const storeNum = match ? match[0] : 'Otros';
+        if (!groupedScans[storeNum]) groupedScans[storeNum] = [];
+        groupedScans[storeNum].push(record);
+      }
     });
 
+    // 1. Create Sheets for Stores (Scans only)
     [...targetStores, 'Otros'].forEach(storeNum => {
-      const storeRecords = groupedData[storeNum];
+      const storeRecords = groupedScans[storeNum];
       if (storeRecords && storeRecords.length > 0) {
-        // Sort by timestamp (already done usually)
         let counter = 1;
-
-        const excelRows = storeRecords.map((r) => {
-          const consecutivo = counter++;
-
-          if (r.recordCategory === 'CARTA_PORTE') {
-            return {
-              "No.": consecutivo,
-              "Tipo": "CARTA PORTE",
-              "RFC Operador": r.cp_rfcOperador,
-              "Licencia": r.cp_licencia,
-              "Operador": r.cp_operador,
-              "No. Economico": r.cp_numEconomico,
-              "Conf. Vehic": r.cp_confVehic,
-              "Placa": r.cp_placa,
-              "Año": r.cp_ano,
-              "Poliza": r.cp_poliza,
-              "Seguro": r.cp_seguro,
-              "Peso": r.cp_peso,
-              "Distribuidora": r.cp_distribuidora || '-',
-              "No. Proveedor": r.cp_proveedorNum || '-',
-              "Fecha Registro": formatDateTime(r.timestamp)
-            };
-          } else {
-             return {
-              "No.": consecutivo,
+        const excelRows = storeRecords.map((r) => ({
+              "No.": counter++,
               "Tipo Doc": r.docType,
               "No. Documento": r.docNumber,
               "Bultos": r.bultos,
@@ -161,9 +156,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
               "Fecha Escaneo": formatDateTime(r.timestamp),
               "Estado": r.status,
               "Fecha Salida": r.verifiedAt ? formatDateTime(r.verifiedAt) : '-'
-            };
-          }
-        });
+        }));
 
         const ws = XLSX.utils.json_to_sheet(excelRows);
         const tabName = STORE_NAMES[storeNum] ? `${storeNum} ${STORE_NAMES[storeNum]}` : `Tienda ${storeNum}`;
@@ -171,34 +164,90 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
       }
     });
 
+    // 2. Create Specific Sheet for CARTA PORTE
+    if (cartaPorteRecords.length > 0) {
+      let cpCounter = 1;
+      const cpRows = cartaPorteRecords.map(r => ({
+              "No.": cpCounter++,
+              "Almacen": r.storeLabel,
+              "Operador": r.cp_operador,
+              "RFC Operador": r.cp_rfcOperador,
+              "Licencia": r.cp_licencia,
+              "Placa": r.cp_placa,
+              "No. Economico": r.cp_numEconomico,
+              "Conf. Vehic": r.cp_confVehic,
+              "Año": r.cp_ano,
+              "Poliza": r.cp_poliza,
+              "Seguro": r.cp_seguro,
+              "Peso": r.cp_peso,
+              "Distribuidora": r.cp_distribuidora || '-',
+              "No. Proveedor": r.cp_proveedorNum || '-',
+              "Fecha Registro": formatDateTime(r.timestamp)
+      }));
+      const wsCP = XLSX.utils.json_to_sheet(cpRows);
+      XLSX.utils.book_append_sheet(wb, wsCP, "CARTA PORTE");
+    }
+
     XLSX.writeFile(wb, "LogiScan_Export.xlsx");
   };
 
+  // Filter records for display
+  const filteredRecords = records.filter(r => {
+    if (viewFilter === 'ALL') return true;
+    if (viewFilter === 'CARTA_PORTE') return r.recordCategory === 'CARTA_PORTE';
+    if (viewFilter === 'SCAN') return r.recordCategory !== 'CARTA_PORTE';
+    return true;
+  });
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-      <div className="p-4 border-b border-slate-200 flex flex-wrap justify-between items-center bg-slate-50 gap-2">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="w-5 h-5 text-violet-600" />
-          <h3 className="font-bold text-slate-700">Registros</h3>
-        </div>
+      
+      {/* Header & Controls */}
+      <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
         
-        <div className="flex items-center gap-2">
-           {records.length > 0 && (
-             <>
-              <button 
-                onClick={handleSyncToGoogle}
-                disabled={isSyncing}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50 ${isScriptMode ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-slate-700 text-white'}`}
-              >
-                {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <CloudUpload className="w-3 h-3" />}
-                {isScriptMode ? 'Sync Central' : 'Sync'}
-              </button>
-              <button onClick={handleExport} className="bg-slate-100 p-1.5 rounded-lg border border-slate-200 hover:bg-slate-200"><Download className="w-4 h-4 text-slate-600" /></button>
-            </>
-          )}
-          <div className="text-xs text-slate-400 font-bold ml-2 border-l pl-3">
-             {records.length} ITEMS
+        <div className="flex flex-wrap justify-between items-center gap-2">
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5 text-violet-600" />
+            <h3 className="font-bold text-slate-700">Registros</h3>
           </div>
+          
+          <div className="flex items-center gap-2">
+            {records.length > 0 && (
+              <>
+                <button 
+                  onClick={handleSyncToGoogle}
+                  disabled={isSyncing}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50 ${isScriptMode ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-slate-700 text-white'}`}
+                >
+                  {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <CloudUpload className="w-3 h-3" />}
+                  {isScriptMode ? 'Sync Central' : 'Sync'}
+                </button>
+                <button onClick={handleExport} className="bg-slate-100 p-1.5 rounded-lg border border-slate-200 hover:bg-slate-200"><Download className="w-4 h-4 text-slate-600" /></button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* View Filter Tabs */}
+        <div className="flex p-1 bg-slate-200/50 rounded-lg w-full sm:w-fit">
+          <button 
+            onClick={() => setViewFilter('ALL')}
+            className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            TODOS ({records.length})
+          </button>
+          <button 
+            onClick={() => setViewFilter('SCAN')}
+            className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'SCAN' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            ESCANEOS
+          </button>
+          <button 
+            onClick={() => setViewFilter('CARTA_PORTE')}
+            className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'CARTA_PORTE' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            CARTA PORTE
+          </button>
         </div>
       </div>
       
@@ -230,8 +279,14 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
                   )}
                 </td>
               </tr>
+            ) : filteredRecords.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs">
+                  No hay registros en esta categoría.
+                </td>
+              </tr>
             ) : (
-              [...records].sort((a, b) => b.timestamp - a.timestamp).map((record) => (
+              [...filteredRecords].sort((a, b) => b.timestamp - a.timestamp).map((record) => (
                 <tr key={record.id} className={`hover:bg-slate-50 transition-colors border-l-[3px] ${record.status === 'VERIFICADO' ? 'border-l-emerald-500 bg-emerald-50/30' : 'border-l-transparent'}`}>
                   
                   {/* TIPO COLUMN */}
