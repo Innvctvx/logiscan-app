@@ -9,7 +9,7 @@ import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, UserCircle, LogOut,
 // --- CONFIGURACIÓN HARDCODED (SIN LOGIN) ---
 // Pega aquí tu URL de Web App de Google Apps Script (debe terminar en /exec)
 // Ejemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUHQlg1j9bnLaDMSeCHvVtLq4UOUYoItqtXJCfm6mQjSFdtKTNKnsWUv0j09nTwn4G/exec"; 
+const GOOGLE_SCRIPT_URL = ""; 
 
 declare global {
   interface Window {
@@ -182,6 +182,17 @@ const App: React.FC = () => {
     osc.stop(ctx.currentTime + 0.3);
   };
 
+  const playDeleteSound = () => {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.type = 'triangle';
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
+    osc.stop(ctx.currentTime + 0.2);
+  };
+
   const handleAddCode = useCallback((code: string) => {
     if (appMode === 'VERIFY') {
       setRecords(prevRecords => {
@@ -201,7 +212,12 @@ const App: React.FC = () => {
       setActiveCodes([]); 
     } else if (appMode === 'REGISTER') {
       setActiveCodes(prev => {
-        if (prev.includes(code)) return prev;
+        // DUPLICATE LOGIC: If code exists, remove it (toggle off)
+        if (prev.includes(code)) {
+          playDeleteSound();
+          return prev.filter(c => c !== code);
+        }
+        // If code doesn't exist, add it
         playSuccessSound();
         return [...prev, code];
       });
