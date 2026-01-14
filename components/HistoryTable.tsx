@@ -35,20 +35,19 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
 
     try {
       // 1. Prepare Data
+      // We use a specific structure: Keys are Sheet Names.
       const groupedData: Record<string, any[]> = {};
       const storeCounters: Record<string, number> = {};
-      let cpCounter = 1; // Global counter for Carta Porte tab
+      let cpCounter = 1; 
       
       records.forEach(r => {
-        // Logic: Scans go to Store Tabs (98, 99...), CP goes to 'CARTA PORTE' tab
-        
         if (r.recordCategory === 'CARTA_PORTE') {
-           const tabName = 'CARTA PORTE';
+           const tabName = 'CARTA PORTE'; // Specific Tab Name
            if (!groupedData[tabName]) groupedData[tabName] = [];
            
            groupedData[tabName].push([
-             cpCounter++,           // A: Consecutivo Global CP
-             r.storeLabel,          // B: Almacen (Important for context)
+             cpCounter++,           // A: Consecutivo
+             r.storeLabel,          // B: Almacen
              r.cp_operador || '',   // C: Operador
              r.cp_rfcOperador || '',// D: RFC
              r.cp_licencia || '',   // E: Licencia
@@ -65,55 +64,57 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
            ]);
 
         } else {
-          // Normal Scans Logic
+          // Normal Scans
           const match = r.storeLabel.match(/(\d+)/);
-          const storeNum = match ? match[0] : 'Otros';
+          const storeNum = match ? match[0] : 'General';
+          const storeName = STORE_NAMES[storeNum] || '';
           
-          if (!groupedData[storeNum]) groupedData[storeNum] = [];
-          if (!storeCounters[storeNum]) storeCounters[storeNum] = 1;
+          // Naming convention: "98 Tacubaya", "99 Tultitlan", etc.
+          const tabName = `${storeNum} ${storeName}`.trim();
 
-          const consecutivo = storeCounters[storeNum]++;
+          if (!groupedData[tabName]) groupedData[tabName] = [];
+          if (!storeCounters[tabName]) storeCounters[tabName] = 1;
 
-          groupedData[storeNum].push([
-            consecutivo, // Column A: Sequential Number
-            r.docType || '', // Column B: Doc Type (EMBARQUE/REMISION)
-            r.docNumber,
-            r.bultos,
-            r.storeLabel,
-            r.destination,
-            r.huCode,
-            r.providerCode,
-            formatDateTime(r.timestamp),
-            r.status,
-            r.verifiedAt ? formatDateTime(r.verifiedAt) : '-'
+          const consecutivo = storeCounters[tabName]++;
+
+          groupedData[tabName].push([
+            consecutivo, // A: No.
+            r.docType || '', // B: Tipo
+            r.docNumber,     // C: Documento
+            r.bultos,        // D: Bultos
+            r.storeLabel,    // E: Almacen (Full label)
+            r.destination,   // F: Destino
+            r.huCode,        // G: HU/LP
+            r.providerCode,  // H: Contenedor
+            formatDateTime(r.timestamp), // I: Fecha Escaneo
+            r.status,        // J: Estado
+            r.verifiedAt ? formatDateTime(r.verifiedAt) : '-' // K: Fecha Salida
           ]);
         }
       });
 
-      // 2. Send Data via WebHook (Preferred Method)
+      // 2. Send Data via WebHook
       if (isScriptMode) {
         await fetch(masterSheetId, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(groupedData)
         });
-        alert("✅ Datos sincronizados correctamente.\n(Se actualizaron las pestañas de Tienda y CARTA PORTE)");
+        alert("✅ Datos sincronizados.\nRevisa las pestañas 'CARTA PORTE' y las de Tienda en tu hoja.");
         setIsSyncing(false);
         return;
       }
 
-      // 3. Fallback / Error if no URL is configured
+      // 3. Fallback
       setIsSyncing(false);
       alert(
         "⚠️ Faltan Ajustes de Conexión ⚠️\n\n" +
-        "El sistema no encuentra la URL del Script de Google.\n\n" +
-        "1. Abre el archivo App.tsx y pega la URL en 'GOOGLE_SCRIPT_URL'.\n" +
-        "2. O toca el botón de engranaje (⚙️) y pégala ahí."
+        "Pega la URL del Script en el botón de engranaje (⚙️)."
       );
 
     } catch (error) {
       console.error("Sync Error", error);
-      alert("❌ Error de red o de servidor. Intenta de nuevo.");
+      alert("❌ Error de red. Verifica tu conexión.");
       setIsSyncing(false);
     }
   };
@@ -139,11 +140,12 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
       }
     });
 
-    // 1. Create Sheets for Stores (Scans only)
+    // 1. Create Sheets for Stores
     [...targetStores, 'Otros'].forEach(storeNum => {
       const storeRecords = groupedScans[storeNum];
       if (storeRecords && storeRecords.length > 0) {
         let counter = 1;
+        // Explicit Headers for Excel
         const excelRows = storeRecords.map((r) => ({
               "No.": counter++,
               "Tipo Doc": r.docType,
@@ -159,12 +161,13 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
         }));
 
         const ws = XLSX.utils.json_to_sheet(excelRows);
-        const tabName = STORE_NAMES[storeNum] ? `${storeNum} ${STORE_NAMES[storeNum]}` : `Tienda ${storeNum}`;
-        XLSX.utils.book_append_sheet(wb, ws, tabName.substring(0, 31));
+        const storeName = STORE_NAMES[storeNum] || '';
+        const tabName = `${storeNum} ${storeName}`.trim().substring(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, tabName);
       }
     });
 
-    // 2. Create Specific Sheet for CARTA PORTE
+    // 2. Create Sheet for CARTA PORTE
     if (cartaPorteRecords.length > 0) {
       let cpCounter = 1;
       const cpRows = cartaPorteRecords.map(r => ({
@@ -191,7 +194,6 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
     XLSX.writeFile(wb, "LogiScan_Export.xlsx");
   };
 
-  // Filter records for display
   const filteredRecords = records.filter(r => {
     if (viewFilter === 'ALL') return true;
     if (viewFilter === 'CARTA_PORTE') return r.recordCategory === 'CARTA_PORTE';
@@ -201,16 +203,12 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-      
-      {/* Header & Controls */}
       <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
-        
         <div className="flex flex-wrap justify-between items-center gap-2">
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5 text-violet-600" />
             <h3 className="font-bold text-slate-700">Registros</h3>
           </div>
-          
           <div className="flex items-center gap-2">
             {records.length > 0 && (
               <>
@@ -227,27 +225,10 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
             )}
           </div>
         </div>
-
-        {/* View Filter Tabs */}
         <div className="flex p-1 bg-slate-200/50 rounded-lg w-full sm:w-fit">
-          <button 
-            onClick={() => setViewFilter('ALL')}
-            className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            TODOS ({records.length})
-          </button>
-          <button 
-            onClick={() => setViewFilter('SCAN')}
-            className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'SCAN' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            ESCANEOS
-          </button>
-          <button 
-            onClick={() => setViewFilter('CARTA_PORTE')}
-            className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'CARTA_PORTE' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            CARTA PORTE
-          </button>
+          <button onClick={() => setViewFilter('ALL')} className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>TODOS ({records.length})</button>
+          <button onClick={() => setViewFilter('SCAN')} className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'SCAN' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>ESCANEOS</button>
+          <button onClick={() => setViewFilter('CARTA_PORTE')} className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'CARTA_PORTE' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>CARTA PORTE</button>
         </div>
       </div>
       
@@ -280,29 +261,17 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
                 </td>
               </tr>
             ) : filteredRecords.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs">
-                  No hay registros en esta categoría.
-                </td>
-              </tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs">No hay registros en esta categoría.</td></tr>
             ) : (
               [...filteredRecords].sort((a, b) => b.timestamp - a.timestamp).map((record) => (
                 <tr key={record.id} className={`hover:bg-slate-50 transition-colors border-l-[3px] ${record.status === 'VERIFICADO' ? 'border-l-emerald-500 bg-emerald-50/30' : 'border-l-transparent'}`}>
-                  
-                  {/* TIPO COLUMN */}
                   <td className="px-3 py-3 border-r border-slate-100">
                      {record.recordCategory === 'CARTA_PORTE' ? (
-                       <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-amber-700 bg-amber-100 px-2 py-1 rounded-md w-fit shadow-sm">
-                         <Truck className="w-3 h-3" /> CP
-                       </span>
+                       <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-amber-700 bg-amber-100 px-2 py-1 rounded-md w-fit shadow-sm"><Truck className="w-3 h-3" /> CP</span>
                      ) : (
-                       <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-violet-700 bg-violet-100 px-2 py-1 rounded-md w-fit shadow-sm">
-                         <Box className="w-3 h-3" /> SCAN
-                       </span>
+                       <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-violet-700 bg-violet-100 px-2 py-1 rounded-md w-fit shadow-sm"><Box className="w-3 h-3" /> SCAN</span>
                      )}
                   </td>
-
-                  {/* DETALLE PRINCIPAL */}
                   <td className="px-3 py-3 border-r border-slate-100">
                     {record.recordCategory === 'CARTA_PORTE' ? (
                       <div>
@@ -316,30 +285,20 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
                       </div>
                     )}
                   </td>
-
-                  {/* ALMACEN */}
                   <td className="px-3 py-3 text-center border-r border-slate-100 bg-slate-50/50">
                     <span className="font-black text-slate-700 text-xs bg-white border border-slate-200 px-2 py-1 rounded shadow-sm">{record.storeLabel}</span>
                   </td>
-
-                  {/* INFO ADICIONAL */}
                   <td className="px-3 py-3 border-r border-slate-100">
                     {record.recordCategory === 'CARTA_PORTE' ? (
                       <div className="text-xs text-slate-500">
-                        <span className="font-bold text-slate-400 text-[10px] uppercase">RFC:</span> {record.cp_rfcOperador} <br/>
-                        {record.cp_distribuidora && (
-                           <span className="text-emerald-600 font-bold bg-emerald-50 px-1 rounded text-[10px]">{record.cp_distribuidora} ({record.cp_proveedorNum})</span>
-                        )}
+                        <span className="font-bold text-slate-400 text-[10px] uppercase">RFC:</span> {record.cp_rfcOperador}
                       </div>
                     ) : (
                       <div className="text-xs text-slate-500">
-                         <span className="font-bold text-slate-400 text-[10px] uppercase">HU:</span> <span className="font-mono">{record.huCode}</span> <br/>
-                         <span className="font-bold text-slate-400 text-[10px] uppercase">PRV:</span> <span className="font-mono">{record.providerCode}</span>
+                         <span className="font-bold text-slate-400 text-[10px] uppercase">HU:</span> <span className="font-mono">{record.huCode}</span>
                       </div>
                     )}
                   </td>
-
-                  {/* FECHA/HORA */}
                   <td className="px-3 py-3 text-right text-[10px] font-mono font-medium text-slate-400">
                     {formatDateTime(record.timestamp)}
                   </td>
