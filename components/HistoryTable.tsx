@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { ScanRecord, STORE_NAMES } from '../types';
-import { FileSpreadsheet, CheckCircle2, Circle, Clock, Download, CloudUpload, Loader2, Lock } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2, Circle, Clock, Download, CloudUpload, Loader2, Lock, Link as LinkIcon, Zap } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface HistoryTableProps {
   records: ScanRecord[];
   accessToken: string | null;
   onLoginRequest: () => void;
+  masterSheetId: string;
 }
 
-export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken, onLoginRequest }) => {
+export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken, onLoginRequest, masterSheetId }) => {
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Check if we are in "Script Mode" (URL instead of ID)
+  const isScriptMode = masterSheetId && masterSheetId.startsWith('https://');
 
   // Format timestamp to HH:MM
   const formatTime = (ts: number) => {
@@ -26,25 +30,20 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
   };
 
   const handleSyncToGoogle = async () => {
-    if (!accessToken) {
-      onLoginRequest();
-      return;
-    }
-
     if (records.length === 0) return;
     setIsSyncing(true);
 
     try {
-      // 1. Group Data Logic (Same as Excel export)
-      const targetStores = ['98', '99', '195', '880'];
+      // 1. Prepare Data for Export
       const groupedData: Record<string, any[]> = {};
-
+      
+      // We process the records to basic values
       records.forEach(r => {
         const match = r.storeLabel.match(/(\d+)/);
         const storeNum = match ? match[0] : 'Otros';
         if (!groupedData[storeNum]) groupedData[storeNum] = [];
         groupedData[storeNum].push([
-          '', // No. (We'll calculate this or leave blank if appending simply)
+          '', // Empty for status check box in sheet
           `1 ${r.docType}`,
           r.docNumber,
           r.bultos,
@@ -58,68 +57,124 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
         ]);
       });
 
-      // 2. Find or Create Spreadsheet
-      const title = getSheetTitle();
-      let spreadsheetId = '';
-      
-      // Search for existing file today
-      const searchRes = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${title}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      const searchData = await searchRes.json();
-
-      if (searchData.files && searchData.files.length > 0) {
-        spreadsheetId = searchData.files[0].id;
-        console.log("Found existing sheet:", spreadsheetId);
-      } else {
-        // Create new
-        console.log("Creating new sheet...");
-        const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+      // --- STRATEGY A: WEBHOOK (NO LOGIN) ---
+      if (isScriptMode) {
+        // Use text/plain to avoid CORS preflight complex checks, data sent as stringified JSON
+        await fetch(masterSheetId, {
           method: 'POST',
-          headers: { 
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8',
           },
-          body: JSON.stringify({
-            properties: { title: title },
-            sheets: [
-                ...targetStores.map(id => ({ properties: { title: id } })),
-                { properties: { title: 'Otros' } }
-            ]
-          })
+          body: JSON.stringify(groupedData)
         });
-        const createData = await createRes.json();
-        spreadsheetId = createData.spreadsheetId;
         
-        // Add headers to new sheet
-        // (Omitting for brevity to ensure basic sync works first, but ideally we batchUpdate headers here)
+        alert("✅ Datos sincronizados correctamente (Auto-Mode).");
+        setIsSyncing(false);
+        return;
       }
 
-      // 3. Append Data
-      // We will loop through the groups and append to each specific sheet (tab)
+      // --- STRATEGY B: OAUTH2 (LOGIN REQUIRED) ---
+      
+      if (!accessToken) {
+        setIsSyncing(false);
+        onLoginRequest();
+        return;
+      }
+
+      const targetStores = ['98', '99', '195', '880'];
+      let spreadsheetId = '';
+
+      if (masterSheetId && !isScriptMode) {
+        // Use provided Sheet ID
+        spreadsheetId = masterSheetId;
+        
+        // Ensure tabs exist
+        try {
+          const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          
+          if (!metaRes.ok) throw new Error("Acceso denegado a la hoja. Verifica ID y permisos.");
+
+          const metaData = await metaRes.json();
+          const existingTitles = metaData.sheets.map((s: any) => s.properties.title);
+          
+          const requests = [];
+          const neededTabs = [...Object.keys(groupedData)];
+          
+          for (const tab of neededTabs) {
+            if (!existingTitles.includes(tab)) {
+               requests.push({ addSheet: { properties: { title: tab } } });
+            }
+          }
+
+          if (requests.length > 0) {
+            await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
+              method: 'POST',
+              headers: { 
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ requests })
+            });
+          }
+        } catch (err: any) {
+          alert(`Error: ${err.message}`);
+          setIsSyncing(false);
+          return;
+        }
+
+      } else {
+        // Create Daily Sheet
+        const title = getSheetTitle();
+        const searchRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=name='${title}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const searchData = await searchRes.json();
+
+        if (searchData.files && searchData.files.length > 0) {
+          spreadsheetId = searchData.files[0].id;
+        } else {
+          const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+            method: 'POST',
+            headers: { 
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              properties: { title: title },
+              sheets: [
+                  ...targetStores.map(id => ({ properties: { title: id } })),
+                  { properties: { title: 'Otros' } }
+              ]
+            })
+          });
+          const createData = await createRes.json();
+          spreadsheetId = createData.spreadsheetId;
+        }
+      }
+
+      // Append Data
       for (const storeNum of Object.keys(groupedData)) {
         const rows = groupedData[storeNum];
         if (rows.length === 0) continue;
-
-        const range = `${storeNum}!A1`; // Appends to the end of the sheet automatically
-        
+        const range = `${storeNum}!A1`; 
         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`, {
           method: 'POST',
           headers: { 
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            values: rows
-          })
+          body: JSON.stringify({ values: rows })
         });
       }
 
-      alert(`✅ Datos sincronizados con éxito en: ${title}`);
+      alert("✅ Datos sincronizados correctamente.");
+
     } catch (error) {
       console.error("Sync Error", error);
-      alert("Error al sincronizar con Google. Revisa la consola o intenta conectarte de nuevo.");
+      alert("Error al sincronizar. Intenta nuevamente.");
     } finally {
       setIsSyncing(false);
     }
@@ -183,7 +238,19 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
       <div className="p-4 border-b border-slate-200 flex flex-wrap justify-between items-center bg-slate-50 gap-2">
         <div className="flex items-center gap-2">
           <FileSpreadsheet className="w-5 h-5 text-green-600" />
-          <h3 className="font-semibold text-slate-700">Hoja de Ruta</h3>
+          <div className="flex flex-col">
+            <h3 className="font-semibold text-slate-700 leading-none">Hoja de Ruta</h3>
+            {isScriptMode && (
+              <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 mt-1">
+                <Zap className="w-3 h-3" /> Auto-Sync Activo
+              </span>
+            )}
+            {!isScriptMode && masterSheetId && (
+               <span className="text-[10px] text-indigo-600 font-bold flex items-center gap-1 mt-1">
+                <LinkIcon className="w-3 h-3" /> Modo Centralizado
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
@@ -192,10 +259,10 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
               <button 
                 onClick={handleSyncToGoogle}
                 disabled={isSyncing}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50 ${accessToken ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-700 text-white hover:bg-slate-800'}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50 ${isScriptMode || accessToken ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-700 text-white hover:bg-slate-800'}`}
               >
-                {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : accessToken ? <CloudUpload className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                {accessToken ? 'Sync Drive' : 'Login Sync'}
+                {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : (isScriptMode || accessToken) ? <CloudUpload className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                {isScriptMode ? 'Enviar Todo' : accessToken ? (masterSheetId ? 'Enviar Central' : 'Sync Drive') : 'Login Sync'}
               </button>
 
               <button 

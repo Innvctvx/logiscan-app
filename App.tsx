@@ -59,23 +59,28 @@ const App: React.FC = () => {
   }, []);
 
   const handleSettings = () => {
-    const newSheetId = prompt(
-      "Configuración de Hoja Maestra (Opcional)\n\n" +
-      "Si quieres que TODOS los datos vayan a una sola hoja de cálculo tuya:\n" +
-      "1. Crea una hoja en Google Sheets.\n" +
-      "2. Compártela con los correos de tus empleados (Permiso Editor).\n" +
-      "3. Copia el ID de la URL (la parte larga entre /d/ y /edit).\n" +
-      "4. Pégalo aquí.\n\n" +
-      "ID Actual:", 
+    const input = prompt(
+      "CONFIGURACIÓN DE CONEXIÓN\n\n" +
+      "OPCIÓN A (Sin Login - Recomendado):\n" +
+      "Pega aquí la 'URL de la aplicación web' que obtuviste de Apps Script.\n(Empieza con https://script.google.com/...)\n\n" +
+      "OPCIÓN B (Requiere Login):\n" +
+      "Pega solo el ID de la hoja de cálculo.\n\n" +
+      "Valor Actual:", 
       masterSheetId
     );
 
-    if (newSheetId !== null) {
-      const cleanId = newSheetId.trim();
-      setMasterSheetId(cleanId);
-      localStorage.setItem('logiscan_master_sheet_id', cleanId);
-      if(cleanId) alert("✅ Hoja Maestra configurada. Todos los datos irán ahí.");
-      else alert("🗑️ Configuración borrada. Se crearán hojas nuevas por día.");
+    if (input !== null) {
+      const cleanVal = input.trim();
+      setMasterSheetId(cleanVal);
+      localStorage.setItem('logiscan_master_sheet_id', cleanVal);
+      
+      if(cleanVal.startsWith('https://')) {
+        alert("✅ Modo Automático Configurado.\nNo será necesario iniciar sesión con Google.");
+      } else if (cleanVal) {
+        alert("✅ ID Configurado.\nSerá necesario que cada usuario inicie sesión.");
+      } else {
+        alert("🗑️ Configuración borrada.");
+      }
     }
   };
 
@@ -83,7 +88,7 @@ const App: React.FC = () => {
     let currentClientId = clientId;
 
     if (!currentClientId) {
-      const input = prompt("Para conectar con Google, necesitas un 'Client ID'.\n\nSi no lo tienes, debes crearlo en Google Cloud Console.\n\nIngresa tu Client ID aquí:");
+      const input = prompt("Para conectar con Google (Modo Manual), necesitas un 'Client ID'.\n\nIngresa tu Client ID aquí:");
       if (!input) return;
       currentClientId = input.trim();
       setClientId(currentClientId);
@@ -182,7 +187,7 @@ const App: React.FC = () => {
           return prev;
         }
 
-        // 2. Add Code (No strict Q/0 check)
+        // 2. Add Code
         playSuccessSound();
         if (prev.length >= 20) return prev; 
         return [...prev, code];
@@ -242,6 +247,11 @@ const App: React.FC = () => {
     
   }, [activeCodes, docType, docNumber, bultos, serviceType]);
 
+  // Determine if we need login (Only if NOT using Webhook URL)
+  const isScriptMode = masterSheetId.startsWith('https://');
+  const showLoginButton = !isScriptMode && !user;
+  const showUserMenu = !isScriptMode && user;
+
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
       {/* Header */}
@@ -265,13 +275,13 @@ const App: React.FC = () => {
               <button 
                 onClick={handleSettings}
                 className={`p-2 rounded-lg transition-colors ${appMode === 'VERIFY' ? 'text-indigo-200 hover:text-white hover:bg-indigo-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
-                title="Configuración de Hoja Maestra"
+                title="Configuración"
               >
                 <Settings className="w-5 h-5" />
               </button>
 
-              {/* Google Login / User Profile */}
-              {!user ? (
+              {/* Login/User UI - Only show if NOT in Script Mode */}
+              {showLoginButton && (
                 <button 
                   onClick={handleLogin}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
@@ -283,7 +293,9 @@ const App: React.FC = () => {
                   <LogIn className="w-4 h-4" />
                   <span className="hidden sm:inline">Conectar</span>
                 </button>
-              ) : (
+              )}
+              
+              {showUserMenu && user && (
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
                    appMode === 'VERIFY' 
                     ? 'bg-indigo-800 border-indigo-700 text-indigo-100' 
@@ -302,6 +314,13 @@ const App: React.FC = () => {
                     <LogOut className="w-3 h-3" />
                   </button>
                 </div>
+              )}
+              
+              {isScriptMode && (
+                 <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs font-bold rounded border border-green-200">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    Auto-Sync
+                 </div>
               )}
 
               {/* Mode Switcher */}
