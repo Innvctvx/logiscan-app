@@ -3,12 +3,13 @@ import { ScannerInput } from './components/ScannerInput';
 import { ControlPanel } from './components/ControlPanel';
 import { HistoryTable } from './components/HistoryTable';
 import { CartaPorteForm } from './components/CartaPorteForm';
+import { ExitTicketForm } from './components/ExitTicketForm';
 import { ScanRecord, ServiceType, DocType, Region, GoogleUser, RecordCategory, CatalogData } from './types';
-import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, Settings, Truck, Code, User, ShieldCheck, Lock, Loader2, LogOut } from 'lucide-react';
+import { PackageCheck, ClipboardList, Settings, Truck, Code, ClipboardCheck, Lock, Loader2, LogOut, FileCheck } from 'lucide-react';
 
 // --- CONFIGURACIÓN ---
 // IMPORTANTE: Asegúrate que esta URL sea la de TU implementación "Aplicación Web" -> "Cualquier usuario"
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzlhw656fqVrapR-QDfyYwnoXhFvcTgNUltHXG2BxhBLHi97jsTaw8QbPqyBJmzje0V/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUHQlg1j9bnLaDMSeCHvVtLq4UOUYoItqtXJCfm6mQjSFdtKTNKnsWUv0j09nTwn4G/exec"; 
 
 declare global {
   interface Window {
@@ -16,7 +17,7 @@ declare global {
   }
 }
 
-type AppMode = 'REGISTER' | 'VERIFY' | 'CARTA_PORTE';
+type AppMode = 'REGISTER' | 'VERIFY' | 'CARTA_PORTE' | 'EXIT_TICKET';
 
 const App: React.FC = () => {
   // --- SESSION STATE ---
@@ -372,37 +373,33 @@ const App: React.FC = () => {
       cp_distribuidora: region === Region.FORANEO ? distribuidora : '',
       cp_proveedorNum: region === Region.FORANEO ? proveedorNum : '',
 
-      // New Time and Exit Ticket Fields
-      cp_entryDate: entryDate,
-      cp_entryTime: entryTime,
-      cp_exitDate: exitDate,
-      cp_exitTime: exitTime,
-      cp_isLoaded: isLoaded,
-      cp_loadPercent: loadPercent,
-      cp_exitSeal: exitSeal
+      // Reset Exit Ticket Fields for Carta Porte log only
+      cp_entryDate: '',
+      cp_entryTime: '',
+      cp_exitDate: '',
+      cp_exitTime: '',
+      cp_isLoaded: '',
+      cp_loadPercent: '',
+      cp_exitSeal: ''
     };
 
     setRecords(prev => [...prev, newRecord]);
     playSuccessSound();
     alert("Carta Porte guardada para " + storeLabel);
 
-    // Reset basics, keep heavy data if needed, but usually reset
+    // Reset basics
     setRfcOperador('');
     setLicencia('');
     setOperadorName('');
     setPlaca('');
-    setExitSeal('');
-    setEntryDate('');
-    setEntryTime('');
-    setExitDate('');
-    setExitTime('');
-  }, [rfcOperador, licencia, operadorName, numEconomico, confVehic, placa, ano, poliza, seguro, peso, distribuidora, proveedorNum, serviceType, region, sessionUser, entryDate, entryTime, exitDate, exitTime, isLoaded, loadPercent, exitSeal]);
+  }, [rfcOperador, licencia, operadorName, numEconomico, confVehic, placa, ano, poliza, seguro, peso, distribuidora, proveedorNum, serviceType, region, sessionUser]);
 
   const getHeaderColor = () => {
     switch (appMode) {
       case 'REGISTER': return 'bg-violet-700 border-violet-800'; 
       case 'VERIFY': return 'bg-emerald-600 border-emerald-700'; 
       case 'CARTA_PORTE': return 'bg-amber-500 border-amber-600'; 
+      case 'EXIT_TICKET': return 'bg-blue-600 border-blue-700';
       default: return 'bg-white border-slate-200';
     }
   };
@@ -515,6 +512,12 @@ const App: React.FC = () => {
                   Carta Porte
                 </button>
                 <button 
+                  onClick={() => setAppMode('EXIT_TICKET')} 
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${appMode === 'EXIT_TICKET' ? 'bg-white text-blue-700 shadow-sm' : 'text-white/70 hover:text-white'}`}
+                >
+                  Hoja Salida
+                </button>
+                <button 
                   onClick={() => setAppMode('VERIFY')} 
                   className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${appMode === 'VERIFY' ? 'bg-white text-emerald-700 shadow-sm' : 'text-white/70 hover:text-white'}`}
                 >
@@ -526,9 +529,10 @@ const App: React.FC = () => {
           
           {/* Mobile Mode Switcher */}
           <div className="md:hidden pb-3 pt-1 flex gap-2 overflow-x-auto no-scrollbar">
-             <button onClick={() => setAppMode('REGISTER')} className={`flex-1 py-2 text-center rounded-lg text-xs font-bold border shadow-sm transition-all ${appMode === 'REGISTER' ? 'bg-violet-100 border-violet-200 text-violet-800' : 'bg-white/90 border-transparent text-slate-500'}`}>Registro</button>
-             <button onClick={() => setAppMode('CARTA_PORTE')} className={`flex-1 py-2 text-center rounded-lg text-xs font-bold border shadow-sm transition-all ${appMode === 'CARTA_PORTE' ? 'bg-amber-100 border-amber-200 text-amber-800' : 'bg-white/90 border-transparent text-slate-500'}`}>Carta Porte</button>
-             <button onClick={() => setAppMode('VERIFY')} className={`flex-1 py-2 text-center rounded-lg text-xs font-bold border shadow-sm transition-all ${appMode === 'VERIFY' ? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white/90 border-transparent text-slate-500'}`}>Verificar</button>
+             <button onClick={() => setAppMode('REGISTER')} className={`flex-1 min-w-[80px] py-2 text-center rounded-lg text-xs font-bold border shadow-sm transition-all ${appMode === 'REGISTER' ? 'bg-violet-100 border-violet-200 text-violet-800' : 'bg-white/90 border-transparent text-slate-500'}`}>Registro</button>
+             <button onClick={() => setAppMode('CARTA_PORTE')} className={`flex-1 min-w-[80px] py-2 text-center rounded-lg text-xs font-bold border shadow-sm transition-all ${appMode === 'CARTA_PORTE' ? 'bg-amber-100 border-amber-200 text-amber-800' : 'bg-white/90 border-transparent text-slate-500'}`}>Carta P.</button>
+             <button onClick={() => setAppMode('EXIT_TICKET')} className={`flex-1 min-w-[80px] py-2 text-center rounded-lg text-xs font-bold border shadow-sm transition-all ${appMode === 'EXIT_TICKET' ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-white/90 border-transparent text-slate-500'}`}>Hoja S.</button>
+             <button onClick={() => setAppMode('VERIFY')} className={`flex-1 min-w-[80px] py-2 text-center rounded-lg text-xs font-bold border shadow-sm transition-all ${appMode === 'VERIFY' ? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white/90 border-transparent text-slate-500'}`}>Verif.</button>
           </div>
         </div>
       </header>
@@ -555,7 +559,19 @@ const App: React.FC = () => {
              </div>
              <div>
                <h3 className="font-bold text-amber-900">Emisión de Carta Porte</h3>
-               <p className="text-xs text-amber-800">Genera Cartas Porte y Hojas de Salida.</p>
+               <p className="text-xs text-amber-800">Genera Cartas Porte para el operador.</p>
+             </div>
+          </div>
+        )}
+
+        {appMode === 'EXIT_TICKET' && (
+           <div className="mb-6 bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-4 animate-fadeIn shadow-sm">
+             <div className="bg-blue-100 p-2 rounded-full">
+                <FileCheck className="w-6 h-6 text-blue-600" />
+             </div>
+             <div>
+               <h3 className="font-bold text-blue-900">Hoja de Salida</h3>
+               <p className="text-xs text-blue-800">Genera e imprime el documento de control de salida.</p>
              </div>
           </div>
         )}
@@ -603,7 +619,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {appMode !== 'CARTA_PORTE' && (
+              {appMode !== 'CARTA_PORTE' && appMode !== 'EXIT_TICKET' && (
                 <ScannerInput 
                   currentCodes={activeCodes}
                   onAddCode={handleAddCode}
@@ -640,20 +656,28 @@ const App: React.FC = () => {
                    distribuidora={distribuidora} setDistribuidora={setDistribuidora}
                    proveedorNum={proveedorNum} setProveedorNum={setProveedorNum}
                    
-                   // New State Props for Exit Ticket
-                   entryDate={entryDate} setEntryDate={setEntryDate}
-                   entryTime={entryTime} setEntryTime={setEntryTime}
-                   exitDate={exitDate} setExitDate={setExitDate}
-                   exitTime={exitTime} setExitTime={setExitTime}
-                   isLoaded={isLoaded} setIsLoaded={setIsLoaded}
-                   loadPercent={loadPercent} setLoadPercent={setLoadPercent}
-                   exitSeal={exitSeal} setExitSeal={setExitSeal}
-
                    serviceType={serviceType} setServiceType={setServiceType}
                    region={region} setRegion={setRegion}
                    onSave={handleSaveCartaPorte}
                    
                    catalogs={catalogs}
+                />
+              )}
+
+              {appMode === 'EXIT_TICKET' && (
+                <ExitTicketForm
+                  operadorName={operadorName} setOperadorName={setOperadorName}
+                  placa={placa} setPlaca={setPlaca}
+                  
+                  entryDate={entryDate} setEntryDate={setEntryDate}
+                  entryTime={entryTime} setEntryTime={setEntryTime}
+                  exitDate={exitDate} setExitDate={setExitDate}
+                  exitTime={exitTime} setExitTime={setExitTime}
+                  isLoaded={isLoaded} setIsLoaded={setIsLoaded}
+                  loadPercent={loadPercent} setLoadPercent={setLoadPercent}
+                  exitSeal={exitSeal} setExitSeal={setExitSeal}
+
+                  catalogs={catalogs}
                 />
               )}
             </div>
