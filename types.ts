@@ -86,7 +86,23 @@ export interface GoogleUser {
   picture: string;
 }
 
+export interface CatalogDriver {
+  rfc: string;
+  license: string;
+  name: string;
+}
+
+export interface CatalogUnit {
+  eco: string;
+  conf: string;
+  placa: string;
+  year: string;
+  policy: string;
+  insurance: string;
+  weight: string;
+}
+
 export interface CatalogData {
-  drivers: string[];
-  units: string[];
+  drivers: CatalogDriver[];
+  units: CatalogUnit[];
 }

@@ -74,6 +74,35 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
     }
   };
 
+  // --- AUTOFILL HANDLERS ---
+  const handleDriverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setOperadorName(val);
+    
+    // Attempt auto-fill
+    const found = catalogs.drivers.find(d => d.name.toUpperCase() === val.toUpperCase());
+    if (found) {
+      setRfcOperador(found.rfc);
+      setLicencia(found.license);
+    }
+  };
+
+  const handleUnitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setNumEconomico(val);
+
+    // Attempt auto-fill
+    const found = catalogs.units.find(u => u.eco.toString() === val.toString());
+    if (found) {
+      setConfVehic(found.conf);
+      setPlaca(found.placa);
+      setAno(found.year);
+      setPoliza(found.policy);
+      setSeguro(found.insurance);
+      setPeso(found.weight);
+    }
+  };
+
   const handleWhatsApp = () => {
      if (!operadorName || !placa) {
        alert("Faltan datos del operador o placa.");
@@ -109,12 +138,12 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
               list="drivers-list"
               type="text" 
               value={operadorName} 
-              onChange={e => setOperadorName(e.target.value)} 
+              onChange={handleDriverChange} 
               className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400 font-bold" 
               placeholder="Escribe para buscar..." 
             />
             <datalist id="drivers-list">
-              {catalogs.drivers.map((d, i) => <option key={i} value={d} />)}
+              {catalogs.drivers.map((d, i) => <option key={i} value={d.name} />)}
             </datalist>
           </div>
 
@@ -144,12 +173,12 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
               list="units-list"
               type="text" 
               value={numEconomico} 
-              onChange={e => setNumEconomico(e.target.value)} 
+              onChange={handleUnitChange} 
               className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" 
               placeholder="Ej. 1734" 
             />
             <datalist id="units-list">
-              {catalogs.units.map((u, i) => <option key={i} value={u} />)}
+              {catalogs.units.map((u, i) => <option key={i} value={u.eco} />)}
             </datalist>
           </div>
           <div>

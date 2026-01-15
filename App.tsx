@@ -121,6 +121,7 @@ const App: React.FC = () => {
       });
       const data = await response.json();
       if (data.result === 'success') {
+        // Ensure data exists before setting
         setCatalogs({
           drivers: data.drivers || [],
           units: data.units || []
