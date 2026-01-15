@@ -8,7 +8,7 @@ import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, Settings, Truck, Co
 
 // --- CONFIGURACIÓN ---
 // IMPORTANTE: Asegúrate que esta URL sea la de TU implementación "Aplicación Web" -> "Cualquier usuario"
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUHQlg1j9bnLaDMSeCHvVtLq4UOUYoItqtXJCfm6mQjSFdtKTNKnsWUv0j09nTwn4G/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzlhw656fqVrapR-QDfyYwnoXhFvcTgNUltHXG2BxhBLHi97jsTaw8QbPqyBJmzje0V/exec"; 
 
 declare global {
   interface Window {
