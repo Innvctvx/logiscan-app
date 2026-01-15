@@ -6,8 +6,9 @@ import { CartaPorteForm } from './components/CartaPorteForm';
 import { ScanRecord, ServiceType, DocType, Region, GoogleUser, RecordCategory } from './types';
 import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, Settings, Truck, Code, User, ShieldCheck, Lock, Loader2, LogOut } from 'lucide-react';
 
-// --- CONFIGURACIÓN HARDCODED (SIN LOGIN) ---
-const GOOGLE_SCRIPT_URL = ""; 
+// --- CONFIGURACIÓN ---
+// IMPORTANTE: Asegúrate que esta URL sea la de TU implementación "Aplicación Web" -> "Cualquier usuario"
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUHQlg1j9bnLaDMSeCHvVtLq4UOUYoItqtXJCfm6mQjSFdtKTNKnsWUv0j09nTwn4G/exec"; 
 
 declare global {
   interface Window {
@@ -80,13 +81,9 @@ const App: React.FC = () => {
   }, []);
 
   const handleSettings = () => {
-    if (GOOGLE_SCRIPT_URL) {
-      alert("⚠️ MODO AUTOMÁTICO ACTIVO ⚠️\n\nEl sistema está configurado internamente.");
-      return;
-    }
-
+    // Permitir editar incluso si hay URL hardcoded, por si acaso cambió
     const input = prompt(
-      "CONFIGURACIÓN DE CONEXIÓN\n\nPegar URL del Script o ID de Hoja:", 
+      "CONFIGURACIÓN DE CONEXIÓN\n\nPegar URL de la Aplicación Web (Script):", 
       masterSheetId
     );
 
@@ -96,11 +93,9 @@ const App: React.FC = () => {
       localStorage.setItem('logiscan_master_sheet_id', cleanVal);
       
       if(cleanVal.startsWith('https://')) {
-        alert("✅ Modo Automático Configurado.");
-      } else if (cleanVal) {
-        alert("✅ ID Configurado. Requiere Login.");
+        alert("✅ Conexión Configurada.");
       } else {
-        alert("🗑️ Configuración borrada.");
+        alert("⚠️ La URL parece inválida. Debe empezar con https://script.google.com/...");
       }
     }
   };
@@ -131,18 +126,29 @@ const App: React.FC = () => {
         })
       });
 
-      const data = await response.json();
+      // Primero obtenemos el texto crudo para depurar errores de HTML (Permisos)
+      const textResponse = await response.text();
+      let data;
+      
+      try {
+        data = JSON.parse(textResponse);
+      } catch (jsonError) {
+        console.error("Respuesta no JSON:", textResponse);
+        alert("❌ ERROR DE PERMISOS DE GOOGLE\n\nEl script devolvió una página de error (HTML) en lugar de datos.\n\nSOLUCIÓN:\n1. Ve a tu Google Script.\n2. Clic en 'Implementar' > 'Nueva implementación'.\n3. En 'Quién tiene acceso', selecciona: 'CUALQUIER USUARIO' (Anyone).\n4. Copia la NUEVA URL y pégala en el engranaje de esta App.");
+        setIsLoggingIn(false);
+        return;
+      }
 
       if (data.result === 'success') {
-        setSessionUser(data.name); // Set the real name from DB
+        setSessionUser(data.name); 
         setIsLoggingIn(false);
       } else {
-        alert("❌ Acceso Denegado: Usuario o contraseña incorrectos.");
+        alert("❌ Acceso Denegado: " + (data.message || "Usuario o contraseña incorrectos."));
         setIsLoggingIn(false);
       }
     } catch (err) {
       console.error(err);
-      alert("❌ Error de conexión. Intenta de nuevo.");
+      alert("❌ Error de red o conexión. Verifica tu internet.");
       setIsLoggingIn(false);
     }
   };
