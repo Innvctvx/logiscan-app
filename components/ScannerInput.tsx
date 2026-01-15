@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Scan, Plus, Trash2, Camera, X, AlertCircle } from 'lucide-react';
+import { Scan, Plus, Trash2, Camera, X, AlertCircle, Pencil, Check } from 'lucide-react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 interface ScannerInputProps {
@@ -7,17 +7,25 @@ interface ScannerInputProps {
   onAddCode: (code: string) => void;
   onClear: () => void;
   onRemoveCode: (index: number) => void;
+  onEditCode?: (index: number, newCode: string) => void; // New prop for editing
 }
 
 export const ScannerInput: React.FC<ScannerInputProps> = ({ 
   currentCodes, 
   onAddCode, 
   onClear,
-  onRemoveCode
+  onRemoveCode,
+  onEditCode
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  
+  // Editing State
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
+
   const inputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   // Determine what we expect next
@@ -30,12 +38,19 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
   const hintColor = expectingContainer ? "text-violet-600" : "text-amber-600";
   const borderColor = expectingContainer ? "border-violet-300 focus:border-violet-500 focus:ring-violet-500" : "border-amber-300 focus:border-amber-500 focus:ring-amber-500";
 
-  // Auto-focus input on mount and after interactions (unless scanning)
+  // Auto-focus input on mount and after interactions (unless scanning or editing)
   useEffect(() => {
-    if (!isScanning) {
+    if (!isScanning && editingIndex === null) {
       inputRef.current?.focus();
     }
-  }, [currentCodes, isScanning]);
+  }, [currentCodes, isScanning, editingIndex]);
+
+  // Focus edit input when editing starts
+  useEffect(() => {
+    if (editingIndex !== null) {
+      editInputRef.current?.focus();
+    }
+  }, [editingIndex]);
 
   // Handle Scanner Initialization
   useEffect(() => {
@@ -95,6 +110,19 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
     }
   };
 
+  const startEditing = (index: number, code: string) => {
+    setEditingIndex(index);
+    setEditValue(code);
+  };
+
+  const saveEdit = (index: number) => {
+    if (editValue.trim() && onEditCode) {
+      onEditCode(index, editValue.trim().toUpperCase());
+    }
+    setEditingIndex(null);
+    setEditValue('');
+  };
+
   return (
     <>
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4">
@@ -126,7 +154,7 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={expectingContainer ? "Código Contenedor..." : "Código Paquete..."}
-            className={`w-full pl-4 pr-12 py-3 bg-slate-50 border rounded-lg focus:ring-2 outline-none transition-all text-lg font-mono font-medium ${borderColor}`}
+            className={`w-full pl-4 pr-12 py-3 bg-white text-slate-900 border rounded-lg focus:ring-2 outline-none transition-all text-lg font-mono font-bold placeholder:text-slate-400 ${borderColor}`}
           />
           <button 
             onClick={() => {
@@ -166,21 +194,52 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
             <div className="bg-slate-50 rounded-xl p-2 max-h-48 overflow-y-auto space-y-2 border border-slate-200">
               {currentCodes.map((code, idx) => (
                 <div key={`${code}-${idx}`} className="flex items-center justify-between bg-white p-3 rounded-lg shadow-sm border border-slate-200 animate-fadeIn">
-                  <div className="flex items-center gap-3">
-                    <span className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-black shadow-sm ${idx === 0 ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
+                  <div className="flex items-center gap-3 flex-1">
+                    <span className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-black shadow-sm shrink-0 ${idx === 0 ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
                       {idx === 0 ? 'C' : 'P'}
                     </span>
-                    <div className="flex flex-col">
-                        <span className="font-mono font-bold text-slate-800 leading-none">{code}</span>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{idx === 0 ? 'Contenedor Principal' : 'Paquete Agregado'}</span>
+                    
+                    <div className="flex flex-col flex-1 min-w-0">
+                        {editingIndex === idx ? (
+                          <div className="flex items-center gap-2">
+                            <input 
+                              ref={editInputRef}
+                              type="text" 
+                              value={editValue} 
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveEdit(idx);
+                              }}
+                              onBlur={() => saveEdit(idx)}
+                              className="w-full p-1 text-sm bg-white text-slate-900 border border-violet-400 rounded outline-none font-mono font-bold uppercase"
+                            />
+                            <button onMouseDown={(e) => e.preventDefault()} onClick={() => saveEdit(idx)} className="text-emerald-500"><Check className="w-4 h-4"/></button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="font-mono font-bold text-slate-800 leading-none truncate">{code}</span>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{idx === 0 ? 'Contenedor Principal' : 'Paquete Agregado'}</span>
+                          </>
+                        )}
                     </div>
                   </div>
-                  <button 
-                    onClick={() => onRemoveCode(idx)}
-                    className="text-slate-300 hover:text-red-500 transition-colors p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {editingIndex !== idx && (
+                      <button 
+                        onClick={() => startEditing(idx, code)}
+                        className="text-slate-300 hover:text-violet-500 transition-colors p-1.5 rounded-md hover:bg-slate-50"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => onRemoveCode(idx)}
+                      className="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-md hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

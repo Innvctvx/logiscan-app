@@ -4,12 +4,10 @@ import { ControlPanel } from './components/ControlPanel';
 import { HistoryTable } from './components/HistoryTable';
 import { CartaPorteForm } from './components/CartaPorteForm';
 import { ScanRecord, ServiceType, DocType, Region, GoogleUser, RecordCategory } from './types';
-import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, UserCircle, LogOut, Settings, Truck, AlertTriangle, Code } from 'lucide-react';
+import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, Settings, Truck, Code, User, ShieldCheck, Lock, Loader2, LogOut } from 'lucide-react';
 
 // --- CONFIGURACIÓN HARDCODED (SIN LOGIN) ---
-// Pega aquí tu URL de Web App de Google Apps Script (debe terminar en /exec)
-// Ejemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUHQlg1j9bnLaDMSeCHvVtLq4UOUYoItqtXJCfm6mQjSFdtKTNKnsWUv0j09nTwn4G/exec"; 
+const GOOGLE_SCRIPT_URL = ""; 
 
 declare global {
   interface Window {
@@ -20,6 +18,14 @@ declare global {
 type AppMode = 'REGISTER' | 'VERIFY' | 'CARTA_PORTE';
 
 const App: React.FC = () => {
+  // --- SESSION STATE ---
+  const [sessionUser, setSessionUser] = useState<string>('');
+  
+  // Login State
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [appMode, setAppMode] = useState<AppMode>('REGISTER');
 
   // Scanner State
@@ -41,10 +47,13 @@ const App: React.FC = () => {
   const [poliza, setPoliza] = useState('');
   const [seguro, setSeguro] = useState('');
   const [peso, setPeso] = useState('');
-  
-  // New State for Foraneo Provider
   const [distribuidora, setDistribuidora] = useState('');
   const [proveedorNum, setProveedorNum] = useState('');
+
+  // --- VERIFICATION STATE (Departure Details) ---
+  const [verifyDriver, setVerifyDriver] = useState('');
+  const [verifyTrailer, setVerifyTrailer] = useState('');
+  const [verifySeal, setVerifySeal] = useState('');
 
   // Assignment State (Shared)
   const [serviceType, setServiceType] = useState<ServiceType>(ServiceType.DOMICILIO);
@@ -56,48 +65,28 @@ const App: React.FC = () => {
   // --- GOOGLE AUTH & SETTINGS STATE ---
   const [user, setUser] = useState<GoogleUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [tokenClient, setTokenClient] = useState<any>(null);
   const [clientId, setClientId] = useState<string>('');
   
-  // Initialize masterSheetId with the hardcoded URL if available
   const [masterSheetId, setMasterSheetId] = useState<string>(GOOGLE_SCRIPT_URL);
 
-  // Initialize Logic
   useEffect(() => {
-    // Load Settings
     const savedClientId = localStorage.getItem('logiscan_client_id');
     if (savedClientId) setClientId(savedClientId);
     
-    // Only load from localStorage if we haven't hardcoded the URL
     if (!GOOGLE_SCRIPT_URL) {
       const savedSheetId = localStorage.getItem('logiscan_master_sheet_id');
       if (savedSheetId) setMasterSheetId(savedSheetId);
     }
-
-    // Init Google (Only needed if NOT using hardcoded URL)
-    if (!GOOGLE_SCRIPT_URL) {
-      const initClient = () => {
-        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
-          console.log("Google Identity Services loaded");
-        } else {
-          setTimeout(initClient, 500);
-        }
-      };
-      initClient();
-    }
   }, []);
 
   const handleSettings = () => {
-    // If hardcoded, alert the user instead of letting them change it easily
     if (GOOGLE_SCRIPT_URL) {
-      alert("⚠️ MODO AUTOMÁTICO ACTIVO ⚠️\n\nEl sistema está configurado internamente para sincronizar con la hoja central.\n\nNo es necesario configurar nada.");
+      alert("⚠️ MODO AUTOMÁTICO ACTIVO ⚠️\n\nEl sistema está configurado internamente.");
       return;
     }
 
     const input = prompt(
-      "CONFIGURACIÓN DE CONEXIÓN\n\n" +
-      "OPCIÓN A (Sin Login):\nPega la URL de la Web App de Apps Script.\n\n" +
-      "OPCIÓN B (Con Login):\nPega el ID de la hoja de cálculo.", 
+      "CONFIGURACIÓN DE CONEXIÓN\n\nPegar URL del Script o ID de Hoja:", 
       masterSheetId
     );
 
@@ -116,50 +105,58 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogin = () => {
-    let currentClientId = clientId;
-
-    if (!currentClientId) {
-      const input = prompt("Ingresa tu Google Client ID:");
-      if (!input) return;
-      currentClientId = input.trim();
-      setClientId(currentClientId);
-      localStorage.setItem('logiscan_client_id', currentClientId);
+  // --- REAL LOGIN LOGIC ---
+  const performLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginUser || !loginPass) {
+      alert("Por favor ingresa usuario y contraseña.");
+      return;
     }
 
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: currentClientId,
-      scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.profile',
-      callback: (tokenResponse: any) => {
-        if (tokenResponse.access_token) {
-          setAccessToken(tokenResponse.access_token);
-          fetch('https://www.googleapis.com/oauth2/v1/userinfo?alt=json', {
-            headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
-          })
-          .then(res => res.json())
-          .then(data => {
-            setUser({
-              name: data.name,
-              email: data.email,
-              picture: data.picture
-            });
-          });
-        }
-      },
-    });
-    
-    setTokenClient(client);
-    client.requestAccessToken();
+    if (!masterSheetId || !masterSheetId.startsWith('https://')) {
+      alert("❌ ERROR: No se ha configurado la URL del Script en el engranaje.");
+      return;
+    }
+
+    setIsLoggingIn(true);
+
+    try {
+      const response = await fetch(masterSheetId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ 
+          action: 'login',
+          username: loginUser,
+          password: loginPass
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.result === 'success') {
+        setSessionUser(data.name); // Set the real name from DB
+        setIsLoggingIn(false);
+      } else {
+        alert("❌ Acceso Denegado: Usuario o contraseña incorrectos.");
+        setIsLoggingIn(false);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ Error de conexión. Intenta de nuevo.");
+      setIsLoggingIn(false);
+    }
   };
 
   const handleLogout = () => {
-    setUser(null);
-    setAccessToken(null);
-    if (window.google) {
-      window.google.accounts.oauth2.revoke(accessToken, () => {
-        console.log('Access token revoked');
-      });
+    if (confirm("¿Cerrar sesión actual?")) {
+      setSessionUser('');
+      setLoginPass('');
     }
+  };
+
+  const handleLogin = () => {
+    setSessionUser('');
+    setLoginPass('');
   };
 
   // Sound effects
@@ -195,13 +192,27 @@ const App: React.FC = () => {
 
   const handleAddCode = useCallback((code: string) => {
     if (appMode === 'VERIFY') {
+      if (!verifyTrailer || !verifySeal || !verifyDriver) {
+        alert("⚠️ ATENCIÓN ⚠️\n\nDebes llenar los DATOS DE SALIDA (Conductor, Remolque, Sello) antes de verificar mercancía.");
+        playErrorSound();
+        return;
+      }
+
       setRecords(prevRecords => {
         let found = false;
         const updatedRecords = prevRecords.map(record => {
           if (record.status === 'PENDIENTE') {
             if (record.huCode === code || record.providerCode === code) {
               found = true;
-              return { ...record, status: 'VERIFICADO', verifiedAt: Date.now() } as ScanRecord;
+              return { 
+                ...record, 
+                status: 'VERIFICADO', 
+                verifiedAt: Date.now(),
+                verifierName: sessionUser, // Col R
+                departureDriver: verifyDriver, // Col N
+                departureTrailer: verifyTrailer, // Col O
+                departureSeal: verifySeal // Col P
+              } as ScanRecord;
             }
           }
           return record;
@@ -212,20 +223,26 @@ const App: React.FC = () => {
       setActiveCodes([]); 
     } else if (appMode === 'REGISTER') {
       setActiveCodes(prev => {
-        // DUPLICATE LOGIC: If code exists, remove it (toggle off)
         if (prev.includes(code)) {
           playDeleteSound();
           return prev.filter(c => c !== code);
         }
-        // If code doesn't exist, add it
         playSuccessSound();
         return [...prev, code];
       });
     }
-  }, [appMode]);
+  }, [appMode, sessionUser, verifyDriver, verifyTrailer, verifySeal]);
 
   const handleRemoveCode = useCallback((index: number) => {
     setActiveCodes(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleEditCode = useCallback((index: number, newCode: string) => {
+    setActiveCodes(prev => {
+      const updated = [...prev];
+      updated[index] = newCode;
+      return updated;
+    });
   }, []);
 
   const handleClearCodes = useCallback(() => {
@@ -246,6 +263,7 @@ const App: React.FC = () => {
       timestamp: Date.now(),
       status: 'PENDIENTE' as const,
       recordCategory: 'SCAN' as RecordCategory,
+      scannerName: sessionUser, // Col Q
       docType,
       docNumber,
       bultos,
@@ -267,7 +285,7 @@ const App: React.FC = () => {
     setDocNumber('');
     setBultos('');
     
-  }, [activeCodes, docType, docNumber, bultos, serviceType]);
+  }, [activeCodes, docType, docNumber, bultos, serviceType, sessionUser]);
 
   const handleSaveCartaPorte = useCallback((storeNumber: string) => {
     if(!rfcOperador || !placa) {
@@ -281,6 +299,7 @@ const App: React.FC = () => {
       timestamp: Date.now(),
       status: 'PENDIENTE',
       recordCategory: 'CARTA_PORTE',
+      scannerName: sessionUser,
       storeLabel,
       destination: 'CARTA PORTE',
       
@@ -308,19 +327,13 @@ const App: React.FC = () => {
     setPlaca('');
     setDistribuidora('');
     setProveedorNum('');
-  }, [rfcOperador, licencia, operadorName, numEconomico, confVehic, placa, ano, poliza, seguro, peso, distribuidora, proveedorNum, serviceType, region]);
+  }, [rfcOperador, licencia, operadorName, numEconomico, confVehic, placa, ano, poliza, seguro, peso, distribuidora, proveedorNum, serviceType, region, sessionUser]);
 
-  const isScriptMode = masterSheetId.startsWith('https://');
-  // If we have a hardcoded URL, we never show the login button
-  const showLoginButton = !GOOGLE_SCRIPT_URL && !isScriptMode && !user;
-  const showUserMenu = !GOOGLE_SCRIPT_URL && !isScriptMode && user;
-
-  // Header Color Logic
   const getHeaderColor = () => {
     switch (appMode) {
-      case 'REGISTER': return 'bg-violet-700 border-violet-800'; // Purple
-      case 'VERIFY': return 'bg-emerald-600 border-emerald-700'; // Green
-      case 'CARTA_PORTE': return 'bg-amber-500 border-amber-600'; // Yellow
+      case 'REGISTER': return 'bg-violet-700 border-violet-800'; 
+      case 'VERIFY': return 'bg-emerald-600 border-emerald-700'; 
+      case 'CARTA_PORTE': return 'bg-amber-500 border-amber-600'; 
       default: return 'bg-white border-slate-200';
     }
   };
@@ -329,6 +342,71 @@ const App: React.FC = () => {
      return appMode === 'CARTA_PORTE' ? 'text-slate-900' : 'text-white';
   };
 
+  // --- LOGIN SCREEN ---
+  if (!sessionUser) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
+        
+        {/* Settings button for initial setup */}
+        <div className="absolute top-4 right-4">
+          <button onClick={handleSettings} className="p-2 text-slate-500 hover:text-white transition-colors">
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl text-center">
+           <div className="bg-violet-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+             <Lock className="w-10 h-10 text-violet-600" />
+           </div>
+           <h1 className="text-2xl font-black text-slate-800 mb-2">Acceso LogiScan</h1>
+           <p className="text-slate-500 mb-8 text-sm">Ingresa tus credenciales registradas.</p>
+           
+           <form onSubmit={performLogin} className="space-y-4">
+             <div className="text-left">
+               <label className="text-[10px] uppercase font-bold text-slate-400 ml-1 mb-1 block">Usuario</label>
+               <input 
+                 type="text" 
+                 value={loginUser}
+                 onChange={(e) => setLoginUser(e.target.value)}
+                 className="w-full text-lg p-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all font-bold placeholder:text-slate-300"
+                 placeholder="Ej. juan.perez"
+                 autoFocus
+               />
+             </div>
+             
+             <div className="text-left">
+               <label className="text-[10px] uppercase font-bold text-slate-400 ml-1 mb-1 block">Contraseña</label>
+               <input 
+                 type="password" 
+                 value={loginPass}
+                 onChange={(e) => setLoginPass(e.target.value)}
+                 className="w-full text-lg p-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all font-bold placeholder:text-slate-300"
+                 placeholder="••••••••"
+               />
+             </div>
+
+             <button 
+               type="submit" 
+               disabled={isLoggingIn}
+               className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-4 rounded-xl transition-colors shadow-lg active:scale-95 transform disabled:opacity-70 disabled:cursor-wait flex justify-center items-center gap-2 mt-4"
+             >
+               {isLoggingIn ? (
+                 <>
+                   <Loader2 className="w-5 h-5 animate-spin" />
+                   VERIFICANDO...
+                 </>
+               ) : (
+                 "INICIAR SESIÓN"
+               )}
+             </button>
+           </form>
+           <p className="mt-8 text-[10px] text-slate-300 uppercase tracking-widest font-bold">LogiScan Systems v2.2</p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MAIN APP ---
   return (
     <div className="min-h-screen bg-slate-50 pb-12 transition-colors duration-500 flex flex-col">
       {/* Header */}
@@ -341,27 +419,19 @@ const App: React.FC = () => {
               </div>
               <div>
                 <h1 className={`text-xl font-black tracking-tight ${getHeaderTextColor()}`}>LogiScan</h1>
+                <p className={`text-[10px] font-medium opacity-80 ${getHeaderTextColor()}`}>Op: {sessionUser}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <button 
-                onClick={handleSettings} 
+                onClick={handleLogout} 
                 className={`p-2 rounded-lg transition-colors hover:bg-white/20 ${getHeaderTextColor()}`}
+                title="Cerrar Sesión"
               >
-                <Settings className="w-5 h-5" />
+                <LogOut className="w-5 h-5" />
               </button>
-
-              {showLoginButton && (
-                <button onClick={handleLogin} className="p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-white transition-colors">
-                  <LogIn className="w-4 h-4" />
-                </button>
-              )}
-              {showUserMenu && user && (
-                 <img src={user.picture} className="w-8 h-8 rounded-full border-2 border-white/50 cursor-pointer hover:scale-105 transition-transform" alt="User" onClick={handleLogout}/>
-              )}
-
-              {/* Desktop Mode Switcher */}
+              
               <div className="hidden md:flex bg-black/20 backdrop-blur-md p-1 rounded-xl border border-white/10 ml-2">
                 <button 
                   onClick={() => setAppMode('REGISTER')} 
@@ -394,17 +464,17 @@ const App: React.FC = () => {
         </div>
       </header>
 
+      {/* Main Content Render (Same as before) */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
-        
-        {/* Status Banners */}
+        {/* Banners */}
         {appMode === 'VERIFY' && (
           <div className="mb-6 bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center gap-4 animate-fadeIn shadow-sm">
              <div className="bg-emerald-100 p-2 rounded-full">
                 <ClipboardCheck className="w-6 h-6 text-emerald-600" />
              </div>
              <div>
-               <h3 className="font-bold text-emerald-900">Modo Verificación</h3>
-               <p className="text-xs text-emerald-700">Escanea para confirmar salida.</p>
+               <h3 className="font-bold text-emerald-900">Modo Verificación de Salida</h3>
+               <p className="text-xs text-emerald-700">Verifica contra escaneos previos.</p>
              </div>
           </div>
         )}
@@ -434,16 +504,43 @@ const App: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
           <div className="lg:col-span-4 space-y-6">
             <div className="lg:sticky lg:top-24 space-y-4">
               
+              {appMode === 'VERIFY' && (
+                <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm space-y-3 mb-4 animate-fadeIn">
+                   <div className="flex items-center gap-2 mb-2 pb-2 border-b border-emerald-100">
+                      <Truck className="w-4 h-4 text-emerald-600" />
+                      <h3 className="text-xs font-black text-emerald-800 uppercase">Datos de Salida (Obligatorios)</h3>
+                   </div>
+                   
+                   <div>
+                     <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Conductor</label>
+                     <input type="text" value={verifyDriver} onChange={e => setVerifyDriver(e.target.value)} className="w-full text-sm p-2 bg-white text-slate-900 border border-slate-200 rounded-lg outline-none focus:border-emerald-500 uppercase font-semibold placeholder:text-slate-400" placeholder="Nombre Conductor" />
+                   </div>
+                   <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Remolque</label>
+                        <input type="text" value={verifyTrailer} onChange={e => setVerifyTrailer(e.target.value)} className="w-full text-sm p-2 bg-white text-slate-900 border border-slate-200 rounded-lg outline-none focus:border-emerald-500 uppercase font-semibold placeholder:text-slate-400" placeholder="Placa/Num" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Sello</label>
+                        <input type="text" value={verifySeal} onChange={e => setVerifySeal(e.target.value)} className="w-full text-sm p-2 bg-white text-slate-900 border border-slate-200 rounded-lg outline-none focus:border-emerald-500 uppercase font-semibold placeholder:text-slate-400" placeholder="Num Sello" />
+                      </div>
+                   </div>
+                   <div className="mt-2 text-[10px] text-emerald-600 font-medium bg-emerald-50 p-2 rounded">
+                      Verificador Responsable: <span className="font-bold">{sessionUser}</span>
+                   </div>
+                </div>
+              )}
+
               {appMode !== 'CARTA_PORTE' && (
                 <ScannerInput 
                   currentCodes={activeCodes}
                   onAddCode={handleAddCode}
                   onClear={handleClearCodes}
                   onRemoveCode={handleRemoveCode}
+                  onEditCode={handleEditCode}
                 />
               )}
               

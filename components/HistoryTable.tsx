@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScanRecord, STORE_NAMES, RecordCategory } from '../types';
-import { FileSpreadsheet, CheckCircle2, Circle, Clock, Download, CloudUpload, Loader2, Lock, Link as LinkIcon, Zap, Truck, Box, AlertTriangle, Filter } from 'lucide-react';
+import { FileSpreadsheet, CheckCircle2, Circle, Clock, Download, CloudUpload, Loader2, Lock, Link as LinkIcon, Zap, Truck, Box, AlertTriangle, Filter, User, ShieldCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface HistoryTableProps {
@@ -34,15 +34,13 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
     setIsSyncing(true);
 
     try {
-      // 1. Prepare Data
-      // We use a specific structure: Keys are Sheet Names.
       const groupedData: Record<string, any[]> = {};
       const storeCounters: Record<string, number> = {};
       let cpCounter = 1; 
       
       records.forEach(r => {
         if (r.recordCategory === 'CARTA_PORTE') {
-           const tabName = 'CARTA PORTE'; // Specific Tab Name
+           const tabName = 'CARTA PORTE'; 
            if (!groupedData[tabName]) groupedData[tabName] = [];
            
            groupedData[tabName].push([
@@ -60,7 +58,8 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
              r.cp_peso || '',
              r.cp_distribuidora || '-',
              r.cp_proveedorNum || '-',
-             formatDateTime(r.timestamp)
+             formatDateTime(r.timestamp),
+             r.scannerName || ''
            ]);
 
         } else {
@@ -68,8 +67,6 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
           const match = r.storeLabel.match(/(\d+)/);
           const storeNum = match ? match[0] : 'General';
           const storeName = STORE_NAMES[storeNum] || '';
-          
-          // Naming convention: "98 Tacubaya", "99 Tultitlan", etc.
           const tabName = `${storeNum} ${storeName}`.trim();
 
           if (!groupedData[tabName]) groupedData[tabName] = [];
@@ -78,43 +75,49 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
           const consecutivo = storeCounters[tabName]++;
 
           groupedData[tabName].push([
-            consecutivo, // A: No.
-            r.docType || '', // B: Tipo
-            r.docNumber,     // C: Documento
-            r.bultos,        // D: Bultos
-            r.storeLabel,    // E: Almacen (Full label)
-            r.destination,   // F: Destino
-            r.huCode,        // G: HU/LP
-            r.providerCode,  // H: Contenedor
-            formatDateTime(r.timestamp), // I: Fecha Escaneo
-            r.status,        // J: Estado
-            r.verifiedAt ? formatDateTime(r.verifiedAt) : '-' // K: Fecha Salida
+            consecutivo,      // A
+            r.docType || '',  // B
+            r.docNumber,      // C
+            '',               // D
+            r.bultos,         // E
+            r.storeLabel,     // F
+            'PAQUETERÍA',     // G
+            r.huCode,         // H
+            '',               // I
+            r.providerCode,   // J
+            formatDateTime(r.timestamp), // K (Fecha Escaneo)
+            r.status,         // L (Estado)
+            r.verifiedAt ? formatDateTime(r.verifiedAt) : '', // M (Fecha Salida)
+            r.departureDriver || '',  // N
+            r.departureTrailer || '', // O
+            r.departureSeal || '',    // P
+            r.scannerName || '',      // Q (Resp Escaneo)
+            r.verifierName || ''      // R (Resp Verificacion)
           ]);
         }
       });
 
-      // 2. Send Data via WebHook
       if (isScriptMode) {
+        // Updated to wrap data in { action: 'sync', sheets: ... }
         await fetch(masterSheetId, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(groupedData)
+          body: JSON.stringify({ 
+            action: 'sync',
+            sheets: groupedData 
+          })
         });
-        alert("✅ Datos sincronizados.\nRevisa las pestañas 'CARTA PORTE' y las de Tienda en tu hoja.");
+        alert("✅ Datos sincronizados con éxito.");
         setIsSyncing(false);
         return;
       }
 
-      // 3. Fallback
       setIsSyncing(false);
-      alert(
-        "⚠️ Faltan Ajustes de Conexión ⚠️\n\n" +
-        "Pega la URL del Script en el botón de engranaje (⚙️)."
-      );
+      alert("⚠️ Faltan Ajustes de Conexión.");
 
     } catch (error) {
       console.error("Sync Error", error);
-      alert("❌ Error de red. Verifica tu conexión.");
+      alert("❌ Error de red.");
       setIsSyncing(false);
     }
   };
@@ -123,9 +126,8 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
     if (records.length === 0) return;
 
     const wb = XLSX.utils.book_new();
-    const targetStores = ['98', '99', '195', '880'];
+    const targetStores = ['98', '99', '185', '880'];
     
-    // Group Data
     const groupedScans: Record<string, ScanRecord[]> = {};
     const cartaPorteRecords: ScanRecord[] = [];
 
@@ -140,24 +142,30 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
       }
     });
 
-    // 1. Create Sheets for Stores
     [...targetStores, 'Otros'].forEach(storeNum => {
       const storeRecords = groupedScans[storeNum];
       if (storeRecords && storeRecords.length > 0) {
         let counter = 1;
-        // Explicit Headers for Excel
+        
         const excelRows = storeRecords.map((r) => ({
-              "No.": counter++,
-              "Tipo Doc": r.docType,
-              "No. Documento": r.docNumber,
-              "Bultos": r.bultos,
-              "Almacen": r.storeLabel,
-              "Destino": r.destination,
-              "HU / LP": r.huCode,
-              "Proveedor / Contenedor": r.providerCode,
-              "Fecha Escaneo": formatDateTime(r.timestamp),
-              "Estado": r.status,
-              "Fecha Salida": r.verifiedAt ? formatDateTime(r.verifiedAt) : '-'
+              "No.": counter++,                                  // A
+              "No. Manifiesto o Remision": r.docType,            // B
+              "No. Documento": r.docNumber,                      // C
+              "No. Pedido": "",                                  // D
+              "No. Bultos": r.bultos,                            // E
+              "No. Alm.": r.storeLabel,                          // F
+              "Nombre Alm. destino": "PAQUETERÍA",               // G
+              "No. Contenedor (HU)": r.huCode,                   // H
+              "No. Proveedor": "",                               // I
+              "Razon social del proveedor": r.providerCode,      // J
+              "Fecha Escaneo": formatDateTime(r.timestamp),      // K
+              "Estado": r.status,                                // L
+              "Fecha Salida": r.verifiedAt ? formatDateTime(r.verifiedAt) : '', // M
+              "Conductor Salida": r.departureDriver || '',       // N
+              "Remolque": r.departureTrailer || '',              // O
+              "Sello": r.departureSeal || '',                    // P
+              "Resp. Escaneo": r.scannerName || '',              // Q
+              "Resp. Verificación": r.verifierName || ''         // R
         }));
 
         const ws = XLSX.utils.json_to_sheet(excelRows);
@@ -167,7 +175,6 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
       }
     });
 
-    // 2. Create Sheet for CARTA PORTE
     if (cartaPorteRecords.length > 0) {
       let cpCounter = 1;
       const cpRows = cartaPorteRecords.map(r => ({
@@ -185,7 +192,8 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
               "Peso": r.cp_peso,
               "Distribuidora": r.cp_distribuidora || '-',
               "No. Proveedor": r.cp_proveedorNum || '-',
-              "Fecha Registro": formatDateTime(r.timestamp)
+              "Fecha Registro": formatDateTime(r.timestamp),
+              "Responsable": r.scannerName
       }));
       const wsCP = XLSX.utils.json_to_sheet(cpRows);
       XLSX.utils.book_append_sheet(wb, wsCP, "CARTA PORTE");
@@ -236,17 +244,16 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
         <table className="w-full text-sm text-left border-collapse">
           <thead className="text-[10px] text-slate-500 uppercase bg-slate-50/80 sticky top-0 z-10 shadow-sm backdrop-blur-sm">
             <tr>
+              <th className="px-3 py-3 border-b border-slate-200">Estado</th>
               <th className="px-3 py-3 border-b border-slate-200">Tipo</th>
-              <th className="px-3 py-3 border-b border-slate-200">Detalle Principal</th>
-              <th className="px-3 py-3 border-b border-slate-200">Almacén</th>
-              <th className="px-3 py-3 border-b border-slate-200">Info Adicional</th>
-              <th className="px-3 py-3 border-b border-slate-200 text-right">Fecha/Hora</th>
+              <th className="px-3 py-3 border-b border-slate-200">Detalle</th>
+              <th className="px-3 py-3 border-b border-slate-200">Responsable</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {records.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-slate-300 font-medium">
+                <td colSpan={4} className="px-4 py-12 text-center text-slate-300 font-medium">
                   {isScriptMode ? (
                      <span className="flex flex-col items-center gap-2">
                        <CheckCircle2 className="w-8 h-8 text-emerald-400 opacity-50" />
@@ -261,10 +268,24 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
                 </td>
               </tr>
             ) : filteredRecords.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs">No hay registros en esta categoría.</td></tr>
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-xs">No hay registros en esta categoría.</td></tr>
             ) : (
               [...filteredRecords].sort((a, b) => b.timestamp - a.timestamp).map((record) => (
                 <tr key={record.id} className={`hover:bg-slate-50 transition-colors border-l-[3px] ${record.status === 'VERIFICADO' ? 'border-l-emerald-500 bg-emerald-50/30' : 'border-l-transparent'}`}>
+                  
+                  {/* Status & Time */}
+                  <td className="px-3 py-3 border-r border-slate-100 w-24">
+                     <div className="flex flex-col gap-1">
+                       {record.status === 'VERIFICADO' ? (
+                          <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded w-fit">VERIF.</span>
+                       ) : (
+                          <span className="text-[9px] font-black text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded w-fit">PEND.</span>
+                       )}
+                       <span className="text-[9px] font-mono text-slate-400">{formatDateTime(record.timestamp).split(',')[1]}</span>
+                     </div>
+                  </td>
+
+                  {/* Type */}
                   <td className="px-3 py-3 border-r border-slate-100">
                      {record.recordCategory === 'CARTA_PORTE' ? (
                        <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-amber-700 bg-amber-100 px-2 py-1 rounded-md w-fit shadow-sm"><Truck className="w-3 h-3" /> CP</span>
@@ -272,35 +293,41 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
                        <span className="flex items-center gap-1 text-[10px] font-black tracking-wide text-violet-700 bg-violet-100 px-2 py-1 rounded-md w-fit shadow-sm"><Box className="w-3 h-3" /> SCAN</span>
                      )}
                   </td>
+
+                  {/* Details */}
                   <td className="px-3 py-3 border-r border-slate-100">
                     {record.recordCategory === 'CARTA_PORTE' ? (
                       <div>
-                        <div className="font-bold text-slate-700">{record.cp_operador}</div>
-                        <div className="text-[10px] text-slate-500 font-mono bg-slate-100 inline-block px-1 rounded mt-1">PLACA: {record.cp_placa}</div>
+                        <div className="font-bold text-slate-700 text-xs">{record.cp_operador}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">PLACA: {record.cp_placa}</div>
                       </div>
                     ) : (
-                      <div>
-                        <div className="font-bold text-slate-700">1 {record.docType}</div>
-                        <div className="text-xs text-slate-500">{record.docNumber} <span className="opacity-60">({record.bultos} bultos)</span></div>
+                      <div className="space-y-1">
+                        <div className="font-bold text-slate-700 text-xs">{record.storeLabel}</div>
+                        <div className="text-[10px] text-slate-500">
+                           HU: <span className="font-mono font-bold">{record.huCode}</span>
+                        </div>
+                        {record.status === 'VERIFICADO' && (
+                          <div className="text-[9px] text-emerald-600 flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3" /> Salida: {record.departureSeal}
+                          </div>
+                        )}
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-center border-r border-slate-100 bg-slate-50/50">
-                    <span className="font-black text-slate-700 text-xs bg-white border border-slate-200 px-2 py-1 rounded shadow-sm">{record.storeLabel}</span>
-                  </td>
-                  <td className="px-3 py-3 border-r border-slate-100">
-                    {record.recordCategory === 'CARTA_PORTE' ? (
-                      <div className="text-xs text-slate-500">
-                        <span className="font-bold text-slate-400 text-[10px] uppercase">RFC:</span> {record.cp_rfcOperador}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-slate-500">
-                         <span className="font-bold text-slate-400 text-[10px] uppercase">HU:</span> <span className="font-mono">{record.huCode}</span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-right text-[10px] font-mono font-medium text-slate-400">
-                    {formatDateTime(record.timestamp)}
+                  
+                  {/* Responsible */}
+                  <td className="px-3 py-3 text-[10px] text-slate-500 font-medium">
+                     <div className="flex items-center gap-1">
+                       <User className="w-3 h-3 text-slate-300" />
+                       {record.scannerName}
+                     </div>
+                     {record.verifierName && (
+                       <div className="flex items-center gap-1 mt-1 text-emerald-600">
+                         <CheckCircle2 className="w-3 h-3" />
+                         {record.verifierName}
+                       </div>
+                     )}
                   </td>
                 </tr>
               ))

@@ -60,16 +60,16 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
         <div className="space-y-4">
           <div>
             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">RFC - Operador</label>
-            <input type="text" value={rfcOperador} onChange={e => setRfcOperador(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase font-medium focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="Ej. XAXX010101000" />
+            <input type="text" value={rfcOperador} onChange={e => setRfcOperador(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase font-medium focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Ej. XAXX010101000" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">N° Licencia</label>
-               <input type="text" value={licencia} onChange={e => setLicencia(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="Num. Licencia" />
+               <input type="text" value={licencia} onChange={e => setLicencia(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Num. Licencia" />
             </div>
             <div>
                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Nombre</label>
-               <input type="text" value={operadorName} onChange={e => setOperadorName(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="Nombre Completo" />
+               <input type="text" value={operadorName} onChange={e => setOperadorName(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Nombre Completo" />
             </div>
           </div>
         </div>
@@ -84,39 +84,39 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Hash className="w-3 h-3"/> No. Económico</label>
-            <input type="text" value={numEconomico} onChange={e => setNumEconomico(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="Ej. 1734" />
+            <input type="text" value={numEconomico} onChange={e => setNumEconomico(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Ej. 1734" />
           </div>
           <div>
             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Conf. Vehic</label>
-            <input type="text" value={confVehic} onChange={e => setConfVehic(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="Ej. C2" />
+            <input type="text" value={confVehic} onChange={e => setConfVehic(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Ej. C2" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Placa</label>
-            <input type="text" value={placa} onChange={e => setPlaca(e.target.value)} className="w-full p-2.5 border border-amber-200 bg-amber-50 rounded-lg text-sm uppercase font-bold text-amber-900 focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="PLACA" />
+            <input type="text" value={placa} onChange={e => setPlaca(e.target.value)} className="w-full p-2.5 border border-amber-200 bg-amber-50 rounded-lg text-sm uppercase font-bold text-amber-900 focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-amber-300" placeholder="PLACA" />
           </div>
            <div>
             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Calendar className="w-3 h-3"/> Año</label>
-            <input type="text" value={ano} onChange={e => setAno(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="2023" />
+            <input type="text" value={ano} onChange={e => setAno(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="2023" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><FileText className="w-3 h-3"/> Póliza</label>
-            <input type="text" value={poliza} onChange={e => setPoliza(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="Num Póliza" />
+            <input type="text" value={poliza} onChange={e => setPoliza(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Num Póliza" />
           </div>
            <div>
             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Shield className="w-3 h-3"/> Seguro</label>
-            <input type="text" value={seguro} onChange={e => setSeguro(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="Aseguradora" />
+            <input type="text" value={seguro} onChange={e => setSeguro(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Aseguradora" />
           </div>
         </div>
 
         <div>
            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Weight className="w-3 h-3"/> Peso</label>
-           <input type="text" value={peso} onChange={e => setPeso(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all" placeholder="Ej. 19" />
+           <input type="text" value={peso} onChange={e => setPeso(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Ej. 19" />
         </div>
       </div>
 
@@ -152,7 +152,7 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
                 type="text" 
                 value={proveedorNum} 
                 onChange={e => setProveedorNum(e.target.value)} 
-                className="w-full p-3 border border-emerald-300 rounded-lg text-lg font-mono font-bold text-emerald-900 bg-white focus:ring-2 focus:ring-emerald-500 outline-none" 
+                className="w-full p-3 border border-emerald-300 rounded-lg text-lg font-mono font-bold text-emerald-900 bg-white focus:ring-2 focus:ring-emerald-500 outline-none placeholder:text-emerald-300" 
                 placeholder="---" 
               />
             </div>

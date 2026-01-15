@@ -65,7 +65,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 value={docNumber}
                 onChange={(e) => setDocNumber(e.target.value)}
                 placeholder="Ej. 7608801"
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono font-medium transition-all"
+                className="w-full pl-9 pr-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono font-medium transition-all placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -78,7 +78,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 value={bultos}
                 onChange={(e) => setBultos(e.target.value)}
                 placeholder="Ej. 130"
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono font-medium transition-all"
+                className="w-full pl-9 pr-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 outline-none font-mono font-medium transition-all placeholder:text-slate-400"
               />
             </div>
           </div>
