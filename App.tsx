@@ -3,12 +3,12 @@ import { ScannerInput } from './components/ScannerInput';
 import { ControlPanel } from './components/ControlPanel';
 import { HistoryTable } from './components/HistoryTable';
 import { CartaPorteForm } from './components/CartaPorteForm';
-import { ScanRecord, ServiceType, DocType, Region, GoogleUser, RecordCategory } from './types';
+import { ScanRecord, ServiceType, DocType, Region, GoogleUser, RecordCategory, CatalogData } from './types';
 import { PackageCheck, ClipboardCheck, ClipboardList, LogIn, Settings, Truck, Code, User, ShieldCheck, Lock, Loader2, LogOut } from 'lucide-react';
 
 // --- CONFIGURACIÓN ---
 // IMPORTANTE: Asegúrate que esta URL sea la de TU implementación "Aplicación Web" -> "Cualquier usuario"
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzlhw656fqVrapR-QDfyYwnoXhFvcTgNUltHXG2BxhBLHi97jsTaw8QbPqyBJmzje0V/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUHQlg1j9bnLaDMSeCHvVtLq4UOUYoItqtXJCfm6mQjSFdtKTNKnsWUv0j09nTwn4G/exec"; 
 
 declare global {
   interface Window {
@@ -51,6 +51,15 @@ const App: React.FC = () => {
   const [distribuidora, setDistribuidora] = useState('');
   const [proveedorNum, setProveedorNum] = useState('');
 
+  // Exit Ticket State (Control de Salida)
+  const [entryDate, setEntryDate] = useState('');
+  const [entryTime, setEntryTime] = useState('');
+  const [exitDate, setExitDate] = useState('');
+  const [exitTime, setExitTime] = useState('');
+  const [isLoaded, setIsLoaded] = useState('SI');
+  const [loadPercent, setLoadPercent] = useState('0%');
+  const [exitSeal, setExitSeal] = useState('');
+
   // --- VERIFICATION STATE (Departure Details) ---
   const [verifyDriver, setVerifyDriver] = useState('');
   const [verifyTrailer, setVerifyTrailer] = useState('');
@@ -62,6 +71,7 @@ const App: React.FC = () => {
   
   // Data State
   const [records, setRecords] = useState<ScanRecord[]>([]);
+  const [catalogs, setCatalogs] = useState<CatalogData>({ drivers: [], units: [] });
 
   // --- GOOGLE AUTH & SETTINGS STATE ---
   const [user, setUser] = useState<GoogleUser | null>(null);
@@ -100,6 +110,27 @@ const App: React.FC = () => {
     }
   };
 
+  // Fetch Catalogs function
+  const fetchCatalogs = async () => {
+    if (!masterSheetId) return;
+    try {
+      const response = await fetch(masterSheetId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'getCatalogs' })
+      });
+      const data = await response.json();
+      if (data.result === 'success') {
+        setCatalogs({
+          drivers: data.drivers || [],
+          units: data.units || []
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching catalogs", e);
+    }
+  };
+
   // --- REAL LOGIN LOGIC ---
   const performLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,11 +153,11 @@ const App: React.FC = () => {
         body: JSON.stringify({ 
           action: 'login',
           username: loginUser,
-          password: loginPass
+          password: loginPass,
+          device: navigator.userAgent // Send device info for logging
         })
       });
 
-      // Primero obtenemos el texto crudo para depurar errores de HTML (Permisos)
       const textResponse = await response.text();
       let data;
       
@@ -134,13 +165,18 @@ const App: React.FC = () => {
         data = JSON.parse(textResponse);
       } catch (jsonError) {
         console.error("Respuesta no JSON:", textResponse);
-        alert("❌ ERROR DE PERMISOS DE GOOGLE\n\nEl script devolvió una página de error (HTML) en lugar de datos.\n\nSOLUCIÓN:\n1. Ve a tu Google Script.\n2. Clic en 'Implementar' > 'Nueva implementación'.\n3. En 'Quién tiene acceso', selecciona: 'CUALQUIER USUARIO' (Anyone).\n4. Copia la NUEVA URL y pégala en el engranaje de esta App.");
+        alert("❌ ERROR DE PERMISOS DE GOOGLE\n\nEl script devolvió una página de error (HTML). Revisa la configuración de implementación (Deploy).");
         setIsLoggingIn(false);
         return;
       }
 
       if (data.result === 'success') {
         setSessionUser(data.name); 
+        setIsLoggingIn(false);
+        // Once logged in, fetch catalogs
+        fetchCatalogs();
+      } else if (data.result === 'active_session') {
+        alert("⚠️ ACCESO DENEGADO\n\nEste usuario ya tiene una sesión activa en otro dispositivo.\nPor seguridad, cierra sesión en el otro dispositivo primero.");
         setIsLoggingIn(false);
       } else {
         alert("❌ Acceso Denegado: " + (data.message || "Usuario o contraseña incorrectos."));
@@ -153,8 +189,21 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    if (confirm("¿Cerrar sesión actual?")) {
+  const handleLogout = async () => {
+    if (confirm("¿Cerrar sesión actual y liberar el acceso?")) {
+      try {
+         // Notify backend to release lock
+         await fetch(masterSheetId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ 
+              action: 'logout',
+              username: loginUser
+            })
+         });
+      } catch (e) {
+        console.error("Logout sync failed", e);
+      }
       setSessionUser('');
       setLoginPass('');
     }
@@ -320,20 +369,33 @@ const App: React.FC = () => {
       cp_seguro: seguro,
       cp_peso: peso,
       cp_distribuidora: region === Region.FORANEO ? distribuidora : '',
-      cp_proveedorNum: region === Region.FORANEO ? proveedorNum : ''
+      cp_proveedorNum: region === Region.FORANEO ? proveedorNum : '',
+
+      // New Time and Exit Ticket Fields
+      cp_entryDate: entryDate,
+      cp_entryTime: entryTime,
+      cp_exitDate: exitDate,
+      cp_exitTime: exitTime,
+      cp_isLoaded: isLoaded,
+      cp_loadPercent: loadPercent,
+      cp_exitSeal: exitSeal
     };
 
     setRecords(prev => [...prev, newRecord]);
     playSuccessSound();
     alert("Carta Porte guardada para " + storeLabel);
 
+    // Reset basics, keep heavy data if needed, but usually reset
     setRfcOperador('');
     setLicencia('');
     setOperadorName('');
     setPlaca('');
-    setDistribuidora('');
-    setProveedorNum('');
-  }, [rfcOperador, licencia, operadorName, numEconomico, confVehic, placa, ano, poliza, seguro, peso, distribuidora, proveedorNum, serviceType, region, sessionUser]);
+    setExitSeal('');
+    setEntryDate('');
+    setEntryTime('');
+    setExitDate('');
+    setExitTime('');
+  }, [rfcOperador, licencia, operadorName, numEconomico, confVehic, placa, ano, poliza, seguro, peso, distribuidora, proveedorNum, serviceType, region, sessionUser, entryDate, entryTime, exitDate, exitTime, isLoaded, loadPercent, exitSeal]);
 
   const getHeaderColor = () => {
     switch (appMode) {
@@ -470,7 +532,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content Render (Same as before) */}
+      {/* Main Content Render */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
         {/* Banners */}
         {appMode === 'VERIFY' && (
@@ -492,7 +554,7 @@ const App: React.FC = () => {
              </div>
              <div>
                <h3 className="font-bold text-amber-900">Emisión de Carta Porte</h3>
-               <p className="text-xs text-amber-800">Datos del Chofer y Vehículo.</p>
+               <p className="text-xs text-amber-800">Genera Cartas Porte y Hojas de Salida.</p>
              </div>
           </div>
         )}
@@ -576,9 +638,21 @@ const App: React.FC = () => {
                    peso={peso} setPeso={setPeso}
                    distribuidora={distribuidora} setDistribuidora={setDistribuidora}
                    proveedorNum={proveedorNum} setProveedorNum={setProveedorNum}
+                   
+                   // New State Props for Exit Ticket
+                   entryDate={entryDate} setEntryDate={setEntryDate}
+                   entryTime={entryTime} setEntryTime={setEntryTime}
+                   exitDate={exitDate} setExitDate={setExitDate}
+                   exitTime={exitTime} setExitTime={setExitTime}
+                   isLoaded={isLoaded} setIsLoaded={setIsLoaded}
+                   loadPercent={loadPercent} setLoadPercent={setLoadPercent}
+                   exitSeal={exitSeal} setExitSeal={setExitSeal}
+
                    serviceType={serviceType} setServiceType={setServiceType}
                    region={region} setRegion={setRegion}
                    onSave={handleSaveCartaPorte}
+                   
+                   catalogs={catalogs}
                 />
               )}
             </div>

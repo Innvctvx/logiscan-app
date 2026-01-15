@@ -1,6 +1,7 @@
-import React from 'react';
-import { User, Truck, Shield, Hash, Calendar, FileText, Weight, Map } from 'lucide-react';
-import { ServiceType, Region, STORES, STORE_NAMES } from '../types';
+import React, { useState } from 'react';
+import { User, Truck, Shield, Hash, Calendar, FileText, Weight, Map, Clock, Percent, FileCheck, Share2 } from 'lucide-react';
+import { ServiceType, Region, STORES, STORE_NAMES, CatalogData } from '../types';
+import { ExitTicket } from './ExitTicket';
 
 interface CartaPorteFormProps {
   rfcOperador: string; setRfcOperador: (v: string) => void;
@@ -15,9 +16,21 @@ interface CartaPorteFormProps {
   peso: string; setPeso: (v: string) => void;
   distribuidora: string; setDistribuidora: (v: string) => void;
   proveedorNum: string; setProveedorNum: (v: string) => void;
+
+  // Time & Exit Sheet Props
+  entryDate: string; setEntryDate: (v: string) => void;
+  entryTime: string; setEntryTime: (v: string) => void;
+  exitDate: string; setExitDate: (v: string) => void;
+  exitTime: string; setExitTime: (v: string) => void;
+  isLoaded: string; setIsLoaded: (v: string) => void;
+  loadPercent: string; setLoadPercent: (v: string) => void;
+  exitSeal: string; setExitSeal: (v: string) => void;
+
   serviceType: ServiceType; setServiceType: (t: ServiceType) => void;
   region: Region; setRegion: (r: Region) => void;
   onSave: (storeNum: string) => void;
+
+  catalogs: CatalogData;
 }
 
 export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
@@ -33,10 +46,22 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
   peso, setPeso,
   distribuidora, setDistribuidora,
   proveedorNum, setProveedorNum,
+
+  entryDate, setEntryDate,
+  entryTime, setEntryTime,
+  exitDate, setExitDate,
+  exitTime, setExitTime,
+  isLoaded, setIsLoaded,
+  loadPercent, setLoadPercent,
+  exitSeal, setExitSeal,
+
   serviceType, setServiceType,
   region, setRegion,
-  onSave
+  onSave,
+  catalogs
 }) => {
+  const [showExitTicket, setShowExitTicket] = useState(false);
+  const [selectedStoreNum, setSelectedStoreNum] = useState('');
 
   const availableStores = region === Region.LOCAL ? STORES.LOCAL : STORES.FORANEO;
 
@@ -49,6 +74,26 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
     }
   };
 
+  const handleWhatsApp = () => {
+     if (!operadorName || !placa) {
+       alert("Faltan datos del operador o placa.");
+       return;
+     }
+     
+     const message = `*LOGISCAN - REPORTE DE SALIDA* 🚚\n\n` +
+       `👤 *Operador:* ${operadorName}\n` +
+       `🚛 *Unidad:* ${numEconomico} [${placa}]\n` +
+       `📦 *Remolque:* ${placa}\n` + // Usually trailer same as placa in quick checks, or add specific field if needed
+       `🔒 *Sello:* ${exitSeal || 'N/A'}\n` +
+       `🕒 *Entrada:* ${entryDate} ${entryTime}\n` +
+       `🕒 *Salida:* ${exitDate} ${exitTime}\n` +
+       `📊 *Estatus:* ${isLoaded === 'SI' ? 'Cargado' : 'Vacío'} (${loadPercent})\n\n` +
+       `✅ *Verificado por LogiScan*`;
+
+     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+     window.open(url, '_blank');
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn">
       
@@ -59,17 +104,28 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
         </h3>
         <div className="space-y-4">
           <div>
-            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">RFC - Operador</label>
-            <input type="text" value={rfcOperador} onChange={e => setRfcOperador(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase font-medium focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Ej. XAXX010101000" />
+            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Nombre (Autocompletar)</label>
+            <input 
+              list="drivers-list"
+              type="text" 
+              value={operadorName} 
+              onChange={e => setOperadorName(e.target.value)} 
+              className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400 font-bold" 
+              placeholder="Escribe para buscar..." 
+            />
+            <datalist id="drivers-list">
+              {catalogs.drivers.map((d, i) => <option key={i} value={d} />)}
+            </datalist>
           </div>
+
           <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">RFC</label>
+              <input type="text" value={rfcOperador} onChange={e => setRfcOperador(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase font-medium focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="XAXX010101000" />
+            </div>
             <div>
                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">N° Licencia</label>
                <input type="text" value={licencia} onChange={e => setLicencia(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Num. Licencia" />
-            </div>
-            <div>
-               <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Nombre</label>
-               <input type="text" value={operadorName} onChange={e => setOperadorName(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Nombre Completo" />
             </div>
           </div>
         </div>
@@ -83,82 +139,90 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
         
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Hash className="w-3 h-3"/> No. Económico</label>
-            <input type="text" value={numEconomico} onChange={e => setNumEconomico(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Ej. 1734" />
+            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Hash className="w-3 h-3"/> No. Económico (Auto)</label>
+            <input 
+              list="units-list"
+              type="text" 
+              value={numEconomico} 
+              onChange={e => setNumEconomico(e.target.value)} 
+              className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" 
+              placeholder="Ej. 1734" 
+            />
+            <datalist id="units-list">
+              {catalogs.units.map((u, i) => <option key={i} value={u} />)}
+            </datalist>
           </div>
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Conf. Vehic</label>
-            <input type="text" value={confVehic} onChange={e => setConfVehic(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Ej. C2" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Placa</label>
             <input type="text" value={placa} onChange={e => setPlaca(e.target.value)} className="w-full p-2.5 border border-amber-200 bg-amber-50 rounded-lg text-sm uppercase font-bold text-amber-900 focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-amber-300" placeholder="PLACA" />
           </div>
-           <div>
-            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Calendar className="w-3 h-3"/> Año</label>
-            <input type="text" value={ano} onChange={e => setAno(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="2023" />
-          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><FileText className="w-3 h-3"/> Póliza</label>
-            <input type="text" value={poliza} onChange={e => setPoliza(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Num Póliza" />
-          </div>
+        {/* Extra Vehicle Info Collapsible could go here, keeping simple for now */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
            <div>
-            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Shield className="w-3 h-3"/> Seguro</label>
-            <input type="text" value={seguro} onChange={e => setSeguro(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Aseguradora" />
-          </div>
-        </div>
-
-        <div>
-           <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase flex items-center gap-1"><Weight className="w-3 h-3"/> Peso</label>
-           <input type="text" value={peso} onChange={e => setPeso(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all placeholder:text-slate-400" placeholder="Ej. 19" />
+              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Conf</label>
+              <input type="text" value={confVehic} onChange={e => setConfVehic(e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" placeholder="C2" />
+           </div>
+           <div>
+              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Año</label>
+              <input type="text" value={ano} onChange={e => setAno(e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" placeholder="2024" />
+           </div>
+           <div>
+              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Peso</label>
+              <input type="text" value={peso} onChange={e => setPeso(e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" placeholder="Ton" />
+           </div>
         </div>
       </div>
 
-      {/* 3. PROVIDER SECTION (Foraneo - Emerald Theme) */}
-      {region === Region.FORANEO && (
-        <div className="bg-emerald-50 p-5 rounded-xl shadow-sm border border-emerald-100 animate-fadeIn">
-          <h3 className="text-xs font-black text-emerald-800 uppercase tracking-widest mb-5 flex items-center gap-2 border-b border-emerald-200 pb-3">
-            <Map className="w-5 h-5 text-emerald-600" /> Distribuidora Foránea
-          </h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="text-[10px] font-bold text-emerald-700/70 mb-2 block uppercase">Seleccionar Distribuidora:</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => handleProviderSelect('TDR')}
-                  className={`py-3 px-3 rounded-xl text-sm font-black border transition-all ${distribuidora === 'TDR' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-200' : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}
-                >
-                  TDR
-                </button>
-                <button
-                  onClick={() => handleProviderSelect('EASO')}
-                  className={`py-3 px-3 rounded-xl text-sm font-black border transition-all ${distribuidora === 'EASO' ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-200' : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'}`}
-                >
-                  EASO
-                </button>
-              </div>
-            </div>
+      {/* 3. CONTROL DE SALIDA & TIEMPOS (NEW) */}
+      <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+         <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-5 flex items-center gap-2 border-b pb-3 border-amber-100">
+          <Clock className="w-5 h-5 text-amber-500" /> Control de Tiempos y Salida
+        </h3>
 
-            <div>
-              <label className="text-[10px] font-bold text-emerald-700/70 mb-1 block uppercase">No. Proveedor Transporte (Editable)</label>
-              <input 
-                type="text" 
-                value={proveedorNum} 
-                onChange={e => setProveedorNum(e.target.value)} 
-                className="w-full p-3 border border-emerald-300 rounded-lg text-lg font-mono font-bold text-emerald-900 bg-white focus:ring-2 focus:ring-emerald-500 outline-none placeholder:text-emerald-300" 
-                placeholder="---" 
-              />
-            </div>
-          </div>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+           <div>
+              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Fecha Entrada</label>
+              <input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700" />
+           </div>
+           <div>
+              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Hora Entrada</label>
+              <input type="time" value={entryTime} onChange={e => setEntryTime(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700" />
+           </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+           <div>
+              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Fecha Salida</label>
+              <input type="date" value={exitDate} onChange={e => setExitDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700" />
+           </div>
+           <div>
+              <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Hora Salida</label>
+              <input type="time" value={exitTime} onChange={e => setExitTime(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-slate-700" />
+           </div>
+        </div>
+
+        <hr className="my-4 border-slate-100"/>
+
+        <div className="grid grid-cols-3 gap-3 mb-4">
+           <div>
+             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Cargado</label>
+             <select value={isLoaded} onChange={e => setIsLoaded(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold">
+               <option value="SI">SI</option>
+               <option value="NO">NO</option>
+             </select>
+           </div>
+           <div>
+             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">% Carga</label>
+             <input type="text" value={loadPercent} onChange={e => setLoadPercent(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold" placeholder="30%" />
+           </div>
+           <div>
+             <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Sello Salida</label>
+             <input type="text" value={exitSeal} onChange={e => setExitSeal(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-blue-600" placeholder="H25" />
+           </div>
+        </div>
+      </div>
 
       {/* 4. DESTINATION SELECTOR */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
@@ -177,11 +241,14 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
              return (
                <button
                  key={num}
-                 onClick={() => onSave(num)}
+                 onClick={() => {
+                   setSelectedStoreNum(num);
+                   onSave(num);
+                 }}
                  className="bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-xl shadow-md active:scale-95 transition-transform flex flex-col items-center relative overflow-hidden group"
                >
                  <span className="text-[10px] uppercase opacity-60 font-bold mb-1 tracking-wider z-10">{STORE_NAMES[num]}</span>
-                 <span className="font-black text-xl z-10 group-hover:scale-105 transition-transform">ASIGNAR {num}</span>
+                 <span className="font-black text-xl z-10 group-hover:scale-105 transition-transform">GUARDAR {num}</span>
                  
                  <div className="absolute bottom-0 left-0 w-full h-1 bg-amber-500"></div>
                </button>
@@ -189,6 +256,45 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
           })}
         </div>
       </div>
+
+      {/* EXTRA TOOLS */}
+      <div className="grid grid-cols-2 gap-4">
+          <button 
+            onClick={() => setShowExitTicket(true)}
+            className="flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 py-3 rounded-xl font-bold hover:bg-blue-100 transition-colors"
+          >
+            <FileCheck className="w-5 h-5" />
+            Hoja Salida
+          </button>
+          
+          <button 
+            onClick={handleWhatsApp}
+            className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 text-green-700 py-3 rounded-xl font-bold hover:bg-green-100 transition-colors"
+          >
+            <Share2 className="w-5 h-5" />
+            WhatsApp
+          </button>
+      </div>
+
+      {/* RENDER EXIT TICKET MODAL */}
+      {showExitTicket && (
+        <ExitTicket 
+          onClose={() => setShowExitTicket(false)}
+          data={{
+            trailer: placa, // Using Placa as Trailer based on typical usage, or add trailer field if distinct
+            isLoaded: isLoaded,
+            percent: loadPercent,
+            driver: operadorName,
+            entryDate,
+            entryTime,
+            exitDate,
+            exitTime,
+            seal: exitSeal,
+            store: '5' // Can be dynamic based on selection
+          }}
+        />
+      )}
+
     </div>
   );
 };

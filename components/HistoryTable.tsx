@@ -44,22 +44,32 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
            if (!groupedData[tabName]) groupedData[tabName] = [];
            
            groupedData[tabName].push([
-             cpCounter++,           // A: Consecutivo
-             r.storeLabel,          // B: Almacen
-             r.cp_operador || '',   // C: Operador
-             r.cp_rfcOperador || '',// D: RFC
-             r.cp_licencia || '',   // E: Licencia
-             r.cp_placa || '',      // F: Placa
-             r.cp_numEconomico || '',
-             r.cp_confVehic || '',
-             r.cp_ano || '',
-             r.cp_poliza || '',
-             r.cp_seguro || '',
-             r.cp_peso || '',
-             r.cp_distribuidora || '-',
-             r.cp_proveedorNum || '-',
-             formatDateTime(r.timestamp),
-             r.scannerName || ''
+             cpCounter++,             // A: Consecutivo
+             r.storeLabel,            // B: Almacen
+             r.cp_operador || '',     // C: Operador
+             r.cp_rfcOperador || '',  // D: RFC
+             r.cp_licencia || '',     // E: Licencia
+             r.cp_placa || '',        // F: Placa
+             r.cp_numEconomico || '', // G: Num Economico
+             r.cp_confVehic || '',    // H: Conf
+             r.cp_ano || '',          // I: Año
+             r.cp_poliza || '',       // J: Poliza
+             r.cp_seguro || '',       // K: Seguro
+             r.cp_peso || '',         // L: Peso
+             r.cp_distribuidora || '-', // M: Distribuidora
+             r.cp_proveedorNum || '-',  // N: Proveedor
+             
+             // --- NUEVOS CAMPOS HOJA SALIDA ---
+             r.cp_entryDate || '',    // O: Fecha Entrada
+             r.cp_entryTime || '',    // P: Hora Entrada
+             r.cp_exitDate || '',     // Q: Fecha Salida
+             r.cp_exitTime || '',     // R: Hora Salida
+             r.cp_isLoaded || '',     // S: Cargado
+             r.cp_loadPercent || '',  // T: % Carga
+             r.cp_exitSeal || '',     // U: Sello Salida
+             
+             formatDateTime(r.timestamp), // V: Fecha Registro
+             r.scannerName || ''          // W: Responsable
            ]);
 
         } else {
@@ -98,7 +108,6 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
       });
 
       if (isScriptMode) {
-        // Updated to wrap data in { action: 'sync', sheets: ... }
         await fetch(masterSheetId, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -192,6 +201,15 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
               "Peso": r.cp_peso,
               "Distribuidora": r.cp_distribuidora || '-',
               "No. Proveedor": r.cp_proveedorNum || '-',
+              // NEW FIELDS FOR EXCEL
+              "Fecha Entrada": r.cp_entryDate,
+              "Hora Entrada": r.cp_entryTime,
+              "Fecha Salida": r.cp_exitDate,
+              "Hora Salida": r.cp_exitTime,
+              "Cargado": r.cp_isLoaded,
+              "% Carga": r.cp_loadPercent,
+              "Sello Salida": r.cp_exitSeal,
+              
               "Fecha Registro": formatDateTime(r.timestamp),
               "Responsable": r.scannerName
       }));
@@ -236,7 +254,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
         <div className="flex p-1 bg-slate-200/50 rounded-lg w-full sm:w-fit">
           <button onClick={() => setViewFilter('ALL')} className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>TODOS ({records.length})</button>
           <button onClick={() => setViewFilter('SCAN')} className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'SCAN' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>ESCANEOS</button>
-          <button onClick={() => setViewFilter('CARTA_PORTE')} className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'CARTA_PORTE' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>CARTA PORTE</button>
+          <button onClick={() => setViewFilter('CARTA_PORTE')} className={`flex-1 sm:flex-none px-4 py-1.5 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'CARTA_PORTE' ? 'bg-amber-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>CARTA PORTE</button>
         </div>
       </div>
       
@@ -300,6 +318,12 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({ records, accessToken
                       <div>
                         <div className="font-bold text-slate-700 text-xs">{record.cp_operador}</div>
                         <div className="text-[10px] text-slate-500 font-mono">PLACA: {record.cp_placa}</div>
+                        {(record.cp_entryTime || record.cp_exitTime) && (
+                           <div className="mt-1 flex gap-2 text-[9px] text-slate-400">
+                              {record.cp_entryTime && <span>IN: {record.cp_entryTime}</span>}
+                              {record.cp_exitTime && <span>OUT: {record.cp_exitTime}</span>}
+                           </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-1">

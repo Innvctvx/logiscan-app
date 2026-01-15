@@ -52,6 +52,17 @@ export interface ScanRecord {
   cp_seguro?: string;
   cp_peso?: string;
   
+  // Time Fields for Carta Porte / Exit Ticket
+  cp_entryDate?: string; // Fecha Ingreso
+  cp_entryTime?: string; // Hora Ingreso
+  cp_exitDate?: string;  // Fecha Salida
+  cp_exitTime?: string;  // Hora Salida
+  
+  // Exit Ticket Specifics
+  cp_isLoaded?: string;  // SI / NO
+  cp_loadPercent?: string; // 30%, 100%, etc
+  cp_exitSeal?: string; // Sello de Salida (H25)
+
   // Fields for Foraneo Provider
   cp_distribuidora?: string;
   cp_proveedorNum?: string;
@@ -73,4 +84,9 @@ export interface GoogleUser {
   name: string;
   email: string;
   picture: string;
+}
+
+export interface CatalogData {
+  drivers: string[];
+  units: string[];
 }
