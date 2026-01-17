@@ -58,10 +58,16 @@ export interface ScanRecord {
   cp_exitDate?: string;  // Fecha Salida
   cp_exitTime?: string;  // Hora Salida
   
-  // Exit Ticket Specifics
+  // Exit Ticket Specifics (Trailer 1)
   cp_isLoaded?: string;  // SI / NO
   cp_loadPercent?: string; // 30%, 100%, etc
   cp_exitSeal?: string; // Sello de Salida (H25)
+
+  // Exit Ticket Specifics (Trailer 2)
+  cp_placa2?: string;
+  cp_isLoaded2?: string;
+  cp_loadPercent2?: string;
+  cp_exitSeal2?: string;
 
   // Fields for Foraneo Provider
   cp_distribuidora?: string;
