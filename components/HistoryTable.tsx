@@ -98,7 +98,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
       } else {
         // DETECCIÓN DE SCRIPT DESACTUALIZADO
         if (resJson.error === "Acción desconocida" || resJson.error === "Action unknown") {
-            alert("⚠️ ERROR DE VERSIÓN: El Script de Google no reconoce la orden 'sync'.\n\nSOLUCIÓN:\n1. Ve al editor de Google Apps Script.\n2. Borra el código viejo y pega el NUEVO código completo.\n3. Implementar > Nueva versión.");
+            alert("⚠️ ERROR CRÍTICO DE SINCRONIZACIÓN: \n\nEl Script de Google NO tiene la función 'sync'.\n\nSOLUCIÓN:\n1. Ve al editor de Apps Script.\n2. Borra el código viejo.\n3. Pega el código nuevo (que te acabo de dar).\n4. Haz clic en 'Implementar -> Nueva versión'.");
         } else {
             alert("❌ Error del servidor: " + (resJson.error || "Error desconocido."));
         }
