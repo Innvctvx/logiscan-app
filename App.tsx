@@ -9,7 +9,7 @@ import { ScanRecord, ServiceType, DocType, Region, GoogleUser, RecordCategory, C
 import { PackageCheck, ClipboardList, Settings, Truck, Code, ClipboardCheck, Lock, Loader2, LogOut, FileCheck } from 'lucide-react';
 
 // --- CONFIGURACIÓN ---
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxYYqynQXi8_fzydhRDOcrYIlObX4kXxQrYESaRRzl6MrYBQ_LyXV6FVbTPzM8tozlc/exec"; 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJoFqW-JcUDOji66AYEm3pS3a4s75dy2KVE3is8n6VDmD2yKbUGtPQW_PXtw7nUmoH/exec"; 
 
 declare global {
   interface Window {
