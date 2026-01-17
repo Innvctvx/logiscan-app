@@ -96,9 +96,9 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
         alert("✅ ¡Sincronización Exitosa! Los datos se han subido a Google Sheets.");
         if (onSyncSuccess) onSyncSuccess();
       } else {
-        // Error específico para detectar script viejo
+        // DETECCIÓN DE SCRIPT DESACTUALIZADO
         if (resJson.error === "Acción desconocida" || resJson.error === "Action unknown") {
-            alert("❌ ERROR CRÍTICO: El Script de Google es una versión antigua que no tiene la función 'sync'. \n\nSOLUCIÓN: Ve a Google Apps Script, pega el código nuevo y haz 'Implementar -> Nueva versión'.");
+            alert("⚠️ ERROR DE VERSIÓN: El Script de Google no reconoce la orden 'sync'.\n\nSOLUCIÓN:\n1. Ve al editor de Google Apps Script.\n2. Borra el código viejo y pega el NUEVO código completo.\n3. Implementar > Nueva versión.");
         } else {
             alert("❌ Error del servidor: " + (resJson.error || "Error desconocido."));
         }
