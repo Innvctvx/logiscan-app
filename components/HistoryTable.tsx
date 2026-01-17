@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { ScanRecord, STORE_NAMES, ServiceType } from '../types';
-import { FileSpreadsheet, CheckCircle2, CloudUpload, Loader2, Download, Box, Truck, User, Trash2, Pencil, X, Save, AlertTriangle } from 'lucide-react';
+import { FileSpreadsheet, CloudUpload, Loader2, Download, Box, Truck, User, Trash2, Pencil, X, Save } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface HistoryTableProps {
@@ -15,6 +15,23 @@ interface HistoryTableProps {
 }
 
 type ViewFilter = 'ALL' | 'SCAN' | 'CARTA_PORTE';
+
+// --- DEFINICIÓN DE ENCABEZADOS ---
+const SCAN_HEADERS = [
+  "CONSECUTIVO", "TIPO DOC", "NUM DOC", "REF", "BULTOS", "TIENDA", "DESTINO", 
+  "CONTENIDO (LP/HU)", "TIPO", "CONTENEDOR/PROV", "FECHA ESCANEO", "ESTATUS", 
+  "FECHA VERIFICACION", "CHOFER SALIDA", "PLACA/ECO SALIDA", "SELLO SALIDA", 
+  "ESCANEO POR", "VERIFICADO POR"
+];
+
+const CP_HEADERS = [
+  "ID", "DESTINO", "OPERADOR", "RFC", "LICENCIA", "PLACA 1", "ECO", "CONFIG", 
+  "AÑO", "POLIZA", "SEGURO", "PESO", "DISTRIBUIDORA", "PROV ID", 
+  "FECHA ENT", "HORA ENT", "FECHA SAL", "HORA SAL", 
+  "CARGADO 1", "% CARGA 1", "SELLO 1", 
+  "PLACA 2", "CARGADO 2", "% CARGA 2", "SELLO 2", 
+  "TIMESTAMP", "USUARIO"
+];
 
 export const HistoryTable: React.FC<HistoryTableProps> = ({ 
   records, 
@@ -43,15 +60,20 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
     setIsSyncing(true);
 
     try {
-      const groupedData: Record<string, any[]> = {};
+      // Estructura: { "NombreHoja": { headers: [...], rows: [...] } }
+      const groupedData: Record<string, { headers: string[], rows: any[] }> = {};
       const storeCounters: Record<string, number> = {};
       let cpCounter = 1; 
       
       records.forEach(r => {
         if (r.recordCategory === 'CARTA_PORTE') {
            const tabName = 'CARTA PORTE'; 
-           if (!groupedData[tabName]) groupedData[tabName] = [];
-           groupedData[tabName].push([
+           
+           if (!groupedData[tabName]) {
+             groupedData[tabName] = { headers: CP_HEADERS, rows: [] };
+           }
+
+           groupedData[tabName].rows.push([
              cpCounter++, r.storeLabel, r.cp_operador || '', r.cp_rfcOperador || '', 
              r.cp_licencia || '', r.cp_placa || '', r.cp_numEconomico || '', r.cp_confVehic || '', 
              r.cp_ano || '', r.cp_poliza || '', r.cp_seguro || '', r.cp_peso || '', 
@@ -61,6 +83,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
              r.cp_placa2 || '-', r.cp_isLoaded2 || 'NO', r.cp_loadPercent2 || '0%', r.cp_exitSeal2 || '-',
              formatDateTime(r.timestamp), r.scannerName || ''
            ]);
+
         } else {
           // Lógica para pestañas por tienda (ej: "98 Tacubaya")
           const match = r.storeLabel.match(/(\d+)/);
@@ -68,12 +91,16 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
           const storeName = STORE_NAMES[storeNum] || '';
           const tabName = `${storeNum} ${storeName}`.trim();
           
-          if (!groupedData[tabName]) groupedData[tabName] = [];
+          if (!groupedData[tabName]) {
+            groupedData[tabName] = { headers: SCAN_HEADERS, rows: [] };
+          }
+          
           if (!storeCounters[tabName]) storeCounters[tabName] = 1;
           const consecutivo = storeCounters[tabName]++;
 
-          groupedData[tabName].push([
-            consecutivo, r.docType || '', r.docNumber, '', r.bultos, r.storeLabel, 'PAQUETERÍA', r.huCode, '', r.providerCode,
+          groupedData[tabName].rows.push([
+            consecutivo, r.docType || '', r.docNumber, '', r.bultos, r.storeLabel, 'PAQUETERÍA', 
+            r.huCode, '', r.providerCode,
             formatDateTime(r.timestamp), r.status, r.verifiedAt ? formatDateTime(r.verifiedAt) : '',
             r.departureDriver || '', r.departureTrailer || '', r.departureSeal || '',
             r.scannerName || '', r.verifierName || ''
@@ -82,7 +109,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
       });
 
       const payload = { action: 'sync', sheets: groupedData };
-      console.log("Enviando payload:", payload);
+      console.log("Enviando payload con encabezados:", payload);
 
       const response = await fetch(masterSheetId, {
         method: 'POST',
@@ -93,12 +120,11 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
       const resJson = await response.json();
       
       if (resJson.result === 'success') {
-        alert("✅ ¡Sincronización Exitosa! Los datos se han subido a Google Sheets.");
+        alert("✅ ¡Sincronización Exitosa! Los datos (con encabezados) se han subido a Google Sheets.");
         if (onSyncSuccess) onSyncSuccess();
       } else {
-        // DETECCIÓN DE SCRIPT DESACTUALIZADO
         if (resJson.error === "Acción desconocida" || resJson.error === "Action unknown") {
-            alert("⚠️ ERROR CRÍTICO DE SINCRONIZACIÓN: \n\nEl Script de Google NO tiene la función 'sync'.\n\nSOLUCIÓN:\n1. Ve al editor de Apps Script.\n2. Borra el código viejo.\n3. Pega el código nuevo (que te acabo de dar).\n4. Haz clic en 'Implementar -> Nueva versión'.");
+            alert("⚠️ ERROR DE VERSIÓN: El Script de Google NO reconoce el formato nuevo.\n\nSOLUCIÓN: Actualiza el código en Apps Script y dale a 'Implementar > Nueva versión'.");
         } else {
             alert("❌ Error del servidor: " + (resJson.error || "Error desconocido."));
         }
