@@ -183,12 +183,41 @@ const App: React.FC = () => {
     osc.stop(ctx.currentTime + 0.1);
   };
 
+  const playErrorSound = () => {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(200, ctx.currentTime);
+    osc.type = 'sawtooth';
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  };
+
   const handleAddCode = useCallback((code: string) => {
-    if (appMode === 'VERIFY') {
+    // 1. DUPLICATE CHECK (GLOBAL)
+    // Evitar agregar si ya existe en la lista local actual
+    const isDuplicateLocal = records.some(r => r.huCode === code || r.providerCode === code);
+    
+    if (appMode === 'REGISTER') {
+      if (isDuplicateLocal) {
+        playErrorSound();
+        alert(`⚠️ DUPLICADO: El código ${code} ya está registrado en memoria.`);
+        return;
+      }
+      // También checar en la lista de escaneo actual antes de agregarlo
+      if (activeCodes.includes(code)) {
+         playErrorSound();
+         return; // Ya está en el staging
+      }
+      
+      setActiveCodes(prev => (playSuccessSound(), [...prev, code]));
+    }
+    else if (appMode === 'VERIFY') {
       if (!verifyTrailer || !verifySeal || !verifyDriver) {
         alert("Llena datos de salida primero");
         return;
       }
+      // En modo verificar, BUSCAMOS el existente y lo actualizamos
       setRecords(prev => {
         let found = false;
         const updated = prev.map(r => {
@@ -206,14 +235,25 @@ const App: React.FC = () => {
           }
           return r;
         });
-        if (found) playSuccessSound();
+        
+        if (found) {
+          playSuccessSound();
+        } else {
+          // Si no se encuentra como pendiente, puede que ya esté verificado o no exista
+          const alreadyVerified = prev.some(r => r.status === 'VERIFICADO' && (r.huCode === code || r.providerCode === code));
+          if (alreadyVerified) {
+            playErrorSound();
+            alert("Este código YA fue verificado anteriormente.");
+          } else {
+            playErrorSound();
+            alert("Código no encontrado en pendientes.");
+          }
+        }
         return updated;
       });
       setActiveCodes([]); 
-    } else {
-      setActiveCodes(prev => prev.includes(code) ? prev.filter(c => c !== code) : (playSuccessSound(), [...prev, code]));
     }
-  }, [appMode, sessionUser, verifyDriver, verifyTrailer, verifySeal]);
+  }, [appMode, sessionUser, verifyDriver, verifyTrailer, verifySeal, records, activeCodes]);
 
   const handleSaveGroup = useCallback((storeNumber: string) => {
     if (activeCodes.length === 0) return;
@@ -373,6 +413,7 @@ const App: React.FC = () => {
                 loadPercent2={loadPercent2} setLoadPercent2={setLoadPercent2}
                 exitSeal2={exitSeal2} setExitSeal2={setExitSeal2}
                 catalogs={catalogs} 
+                scriptUrl={masterSheetId}
               />
             )}
           </div>
