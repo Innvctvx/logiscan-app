@@ -11,7 +11,7 @@ import { playSuccessSound, playErrorSound } from './services/soundService';
 import { api } from './services/api';
 
 // --- CONFIGURACIÓN ---
-const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzlhw656fqVrapR-QDfyYwnoXhFvcTgNUltHXG2BxhBLHi97jsTaw8QbPqyBJmzje0V/exec"; 
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKKKEwil8Byd3eMwgQgd9k_jN1g5yjdNO5pghkaGWszeqcrav04-3JJIHiOFXdmEwc/exec"; 
 
 type AppMode = 'REGISTER' | 'VERIFY' | 'CARTA_PORTE' | 'EXIT_TICKET';
 
