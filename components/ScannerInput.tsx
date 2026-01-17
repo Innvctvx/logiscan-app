@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Scan, Plus, Trash2, Camera, X, AlertCircle, Pencil, Check } from 'lucide-react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
@@ -7,7 +8,7 @@ interface ScannerInputProps {
   onAddCode: (code: string) => void;
   onClear: () => void;
   onRemoveCode: (index: number) => void;
-  onEditCode?: (index: number, newCode: string) => void; // New prop for editing
+  onEditCode?: (index: number, newCode: string) => void; 
 }
 
 export const ScannerInput: React.FC<ScannerInputProps> = ({ 
@@ -20,7 +21,6 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   
-  // Editing State
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -28,31 +28,27 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
   const editInputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
-  // Determine what we expect next
+  // Grouping Logic: 0 scans = Container, 1+ scans = Packages
   const expectingContainer = currentCodes.length === 0;
   const hintText = expectingContainer 
-    ? "Escanea el CONTENEDOR Principal" 
-    : "Escanea los PAQUETES (HU)";
+    ? "PASO 1: Escanea el CONTENEDOR Principal (Ej: Q009...)" 
+    : "PASO 2: Escanea los PAQUETES (HU)";
   
-  // Use Violet for Container, Amber for Packages
   const hintColor = expectingContainer ? "text-violet-600" : "text-amber-600";
   const borderColor = expectingContainer ? "border-violet-300 focus:border-violet-500 focus:ring-violet-500" : "border-amber-300 focus:border-amber-500 focus:ring-amber-500";
 
-  // Auto-focus input on mount and after interactions (unless scanning or editing)
   useEffect(() => {
     if (!isScanning && editingIndex === null) {
       inputRef.current?.focus();
     }
   }, [currentCodes, isScanning, editingIndex]);
 
-  // Focus edit input when editing starts
   useEffect(() => {
     if (editingIndex !== null) {
       editInputRef.current?.focus();
     }
   }, [editingIndex]);
 
-  // Handle Scanner Initialization
   useEffect(() => {
     if (isScanning) {
       const timer = setTimeout(() => {
@@ -153,7 +149,7 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={expectingContainer ? "Código Contenedor..." : "Código Paquete..."}
+            placeholder={expectingContainer ? "1. Código Contenedor..." : "2. Código Paquete..."}
             className={`w-full pl-4 pr-12 py-3 bg-white text-slate-900 border rounded-lg focus:ring-2 outline-none transition-all text-lg font-mono font-bold placeholder:text-slate-400 ${borderColor}`}
           />
           <button 
@@ -173,13 +169,13 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
         {/* Staging Area Display */}
         <div className="space-y-2">
           <div className="flex justify-between items-center text-sm text-slate-500 mb-2">
-            <span className="font-medium">En grupo actual: {currentCodes.length}</span>
+            <span className="font-medium">Grupo Actual: {currentCodes.length > 0 ? `${currentCodes.length} Items` : 'Vacío'}</span>
             {currentCodes.length > 0 && (
               <button 
                 onClick={onClear}
                 className="text-red-500 hover:text-red-600 flex items-center gap-1 text-xs font-bold bg-red-50 px-2 py-1 rounded"
               >
-                <Trash2 className="w-3 h-3" /> BORRAR TODO
+                <Trash2 className="w-3 h-3" /> REINICIAR GRUPO
               </button>
             )}
           </div>
@@ -187,8 +183,8 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
           {currentCodes.length === 0 ? (
             <div className="p-6 border-2 border-dashed border-violet-100 rounded-xl flex flex-col items-center justify-center text-slate-400 bg-violet-50/30">
               <AlertCircle className="w-8 h-8 mb-2 opacity-50 text-violet-300" />
-              <span className="text-sm font-bold text-violet-900/50">Listo para iniciar grupo</span>
-              <span className="text-xs text-violet-800/40">Escanea el Contenedor Principal</span>
+              <span className="text-sm font-bold text-violet-900/50">Listo para agrupar</span>
+              <span className="text-xs text-violet-800/40">Inicia escaneando el Contenedor</span>
             </div>
           ) : (
             <div className="bg-slate-50 rounded-xl p-2 max-h-48 overflow-y-auto space-y-2 border border-slate-200">
@@ -218,7 +214,7 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
                         ) : (
                           <>
                             <span className="font-mono font-bold text-slate-800 leading-none truncate">{code}</span>
-                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{idx === 0 ? 'Contenedor Principal' : 'Paquete Agregado'}</span>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{idx === 0 ? 'Contenedor' : 'Paquete'}</span>
                           </>
                         )}
                     </div>

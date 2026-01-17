@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Clock, FileCheck, Truck, Layers, CloudUpload, Loader2, Plus } from 'lucide-react';
+import { Clock, FileCheck, Truck, Layers, CloudUpload, Loader2, Plus, AlertTriangle } from 'lucide-react';
 import { CatalogData } from '../types';
 import { ExitTicket } from './ExitTicket';
 
 interface ExitTicketFormProps {
   operadorName: string; setOperadorName: (v: string) => void;
-  placa: string; setPlaca: (v: string) => void; // Internamente sigue siendo 'placa' pero en UI será 'Número de Remolque'
+  placa: string; setPlaca: (v: string) => void;
   
   entryDate: string; setEntryDate: (v: string) => void;
   entryTime: string; setEntryTime: (v: string) => void;
@@ -53,9 +53,7 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
   // Inicializar fecha/hora si están vacías
   useEffect(() => {
     const now = new Date();
-    // Formato YYYY-MM-DD
     const dateStr = now.getFullYear() + '-' + (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
-    // Formato HH:mm
     const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
     if (!entryDate) setEntryDate(dateStr);
@@ -64,32 +62,29 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
     if (!exitTime) setExitTime(timeStr);
   }, []);
 
-  const handleDriverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setOperadorName(e.target.value);
-  };
-
   const sendToGoogleSheet = async () => {
-    if (!scriptUrl) return alert("URL del script no configurada");
+    if (!scriptUrl) return alert("⚠️ URL del script no configurada");
     
     setIsSending(true);
     
+    // Objeto de datos limpio para evitar errores
     const payload = {
       action: 'saveExitTicket',
       data: {
-        D11: placa,
-        F11: isLoaded,
-        I11: loadPercent,
+        D11: placa || 'S/N',
+        F11: isLoaded || 'NO',
+        I11: loadPercent || '0%',
         
         D13: placa2 || '',
         F13: hasSecondTrailer || placa2 ? isLoaded2 : '',
         I13: hasSecondTrailer || placa2 ? loadPercent2 : '',
         
-        E15: operadorName,
+        E15: operadorName || 'S/N',
         E17: `${entryDate} ${entryTime}`,
         E19: `${exitDate} ${exitTime}`,
         
-        H25: exitSeal,
-        H26: exitSeal2
+        H25: exitSeal || '',
+        H26: exitSeal2 || ''
       }
     };
 
@@ -101,20 +96,26 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
       });
       const res = await response.json();
       if (res.result === 'success') {
-        alert("✅ Hoja de Salida Generada en Google Sheets Correctamente");
+        alert("✅ Hoja guardada en Google Sheets correctamente.");
       } else {
-        alert("❌ Error al generar en Sheets: " + (res.error || "Desconocido"));
+        alert("❌ Error del Script: " + (res.error || "Desconocido") + "\n\n⚠️ IMPORTANTE: Asegúrate de haber hecho 'Nueva Versión' en Google Apps Script.");
       }
     } catch (e) {
-      alert("❌ Error de conexión");
+      alert("❌ Error de conexión (Revise su internet o la URL del script)");
     } finally {
       setIsSending(false);
     }
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-10">
+    <div className="space-y-6 animate-fadeIn pb-20">
       
+      {/* Aviso Manual */}
+      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg flex items-center gap-2">
+        <AlertTriangle className="w-5 h-5 text-blue-600" />
+        <p className="text-xs text-blue-800 font-bold">Modo Manual: Ingrese los datos directamente.</p>
+      </div>
+
       {/* 1. Datos de la Unidad */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
         <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-5 flex items-center gap-2 border-b pb-3 border-blue-100">
@@ -123,46 +124,48 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
         
         <div className="space-y-4">
            <div>
-            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Operador</label>
+            <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Nombre del Operador</label>
             <input 
-              list="drivers-list-exit"
               type="text" 
               value={operadorName} 
-              onChange={handleDriverChange} 
-              className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase focus:ring-2 focus:ring-blue-400 outline-none transition-all placeholder:text-slate-400 font-bold" 
-              placeholder="Nombre operador" 
+              onChange={e => setOperadorName(e.target.value)} 
+              className="w-full p-3 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm uppercase focus:ring-2 focus:ring-blue-400 outline-none transition-all font-bold placeholder:text-slate-300" 
+              placeholder="ESCRIBA EL NOMBRE AQUÍ" 
             />
-            <datalist id="drivers-list-exit">
-              {catalogs.drivers.map((d, i) => <option key={i} value={d.name} />)}
-            </datalist>
+            {/* Datalist opcional, no interfiere si está vacío */}
+            {catalogs.drivers.length > 0 && (
+              <datalist id="drivers-list-exit">
+                {catalogs.drivers.map((d, i) => <option key={i} value={d.name} />)}
+              </datalist>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
              <div>
-                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Número de Remolque 1</label>
+                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Remolque 1 (Placa/Eco)</label>
                 <input 
                   type="text" 
                   value={placa} 
                   onChange={e => setPlaca(e.target.value)} 
-                  className="w-full p-2.5 border border-blue-200 bg-blue-50 rounded-lg text-sm uppercase font-bold text-blue-900 focus:ring-2 focus:ring-blue-400 outline-none transition-all" 
-                  placeholder="REMOLQUE 1" 
+                  className="w-full p-3 border border-blue-200 bg-blue-50 rounded-lg text-sm uppercase font-bold text-blue-900 focus:ring-2 focus:ring-blue-400 outline-none transition-all" 
+                  placeholder="000000" 
                 />
              </div>
              <div>
-                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Número de Remolque 2</label>
+                <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Remolque 2 (Opcional)</label>
                 <input 
                   type="text" 
                   value={placa2} 
                   onChange={e => setPlaca2(e.target.value)} 
-                  className={`w-full p-2.5 border rounded-lg text-sm uppercase font-bold focus:ring-2 focus:ring-blue-400 outline-none transition-all ${placa2 ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-400'}`} 
-                  placeholder="REMOLQUE 2 (Opcional)" 
+                  className={`w-full p-3 border rounded-lg text-sm uppercase font-bold focus:ring-2 focus:ring-blue-400 outline-none transition-all ${placa2 ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-400'}`} 
+                  placeholder="Opcional" 
                 />
              </div>
           </div>
         </div>
       </div>
 
-      {/* 2. Tiempos (INPUTS NATIVOS) */}
+      {/* 2. Tiempos (NATIVOS) */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-5 flex items-center gap-2 border-b pb-3 border-blue-100">
           <Clock className="w-5 h-5 text-blue-500" /> Tiempos de Patio
@@ -176,7 +179,7 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
                type="date" 
                value={entryDate} 
                onChange={e => setEntryDate(e.target.value)} 
-               className="w-full p-2 border border-slate-300 rounded-lg text-sm font-bold bg-slate-50 uppercase focus:ring-2 focus:ring-blue-400 outline-none"
+               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold uppercase focus:ring-2 focus:ring-blue-400 outline-none"
              />
            </div>
            <div>
@@ -185,7 +188,7 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
                type="time" 
                value={entryTime} 
                onChange={e => setEntryTime(e.target.value)} 
-               className="w-full p-2 border border-slate-300 rounded-lg text-sm font-bold bg-slate-50 uppercase focus:ring-2 focus:ring-blue-400 outline-none"
+               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold uppercase focus:ring-2 focus:ring-blue-400 outline-none"
              />
            </div>
         </div>
@@ -198,7 +201,7 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
                type="date" 
                value={exitDate} 
                onChange={e => setExitDate(e.target.value)} 
-               className="w-full p-2 border border-slate-300 rounded-lg text-sm font-bold bg-slate-50 uppercase focus:ring-2 focus:ring-blue-400 outline-none"
+               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold uppercase focus:ring-2 focus:ring-blue-400 outline-none"
              />
            </div>
            <div>
@@ -207,7 +210,7 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
                type="time" 
                value={exitTime} 
                onChange={e => setExitTime(e.target.value)} 
-               className="w-full p-2 border border-slate-300 rounded-lg text-sm font-bold bg-slate-50 uppercase focus:ring-2 focus:ring-blue-400 outline-none"
+               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold uppercase focus:ring-2 focus:ring-blue-400 outline-none"
              />
            </div>
         </div>
@@ -216,10 +219,10 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
       {/* 3. Carga Remolque 1 */}
       <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-5 flex items-center gap-2 border-b pb-3 border-blue-100">
-          <Layers className="w-5 h-5 text-blue-500" /> Remolque 1
+          <Layers className="w-5 h-5 text-blue-500" /> Detalle de Carga (Remolque 1)
         </h3>
         <div className="grid grid-cols-3 gap-3">
-           <div><label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Cargado</label>
+           <div><label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">¿Cargado?</label>
              <select value={isLoaded} onChange={e => setIsLoaded(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold">
                <option value="SI">SI</option><option value="NO">NO</option>
              </select>
@@ -228,7 +231,7 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
              <input type="text" value={loadPercent} onChange={e => setLoadPercent(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold" />
            </div>
            <div><label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Sello</label>
-             <input type="text" value={exitSeal} onChange={e => setExitSeal(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-blue-600" />
+             <input type="text" value={exitSeal} onChange={e => setExitSeal(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold text-blue-600" placeholder="SIN SELLO" />
            </div>
         </div>
       </div>
@@ -240,13 +243,13 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
               <Layers className="w-5 h-5 text-blue-500" /> Remolque 2
             </h3>
             {!(hasSecondTrailer || placa2) && (
-              <button onClick={() => setHasSecondTrailer(true)} className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded-md flex items-center gap-1">
-                <Plus className="w-3 h-3" /> AGREGAR SEGUNDO
+              <button onClick={() => setHasSecondTrailer(true)} className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-1 rounded-md flex items-center gap-1 border border-blue-100">
+                <Plus className="w-3 h-3" /> AGREGAR
               </button>
             )}
          </div>
         <div className="grid grid-cols-3 gap-3">
-           <div><label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Cargado</label>
+           <div><label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">¿Cargado?</label>
              <select disabled={!(hasSecondTrailer || placa2)} value={isLoaded2} onChange={e => setIsLoaded2(e.target.value)} className="w-full p-2 border rounded-lg text-sm font-bold">
                <option value="SI">SI</option><option value="NO">NO</option>
              </select>
@@ -272,7 +275,7 @@ export const ExitTicketForm: React.FC<ExitTicketFormProps> = ({
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all flex justify-center items-center gap-3 disabled:opacity-50 disabled:active:scale-100"
         >
           {isSending ? <Loader2 className="w-6 h-6 animate-spin" /> : <CloudUpload className="w-6 h-6" />}
-          GENERAR EN GOOGLE SHEETS
+          GENERAR HOJA EN SHEETS
         </button>
 
         <button 
