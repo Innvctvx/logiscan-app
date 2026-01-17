@@ -218,7 +218,9 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
                         ) : (
                           <>
                             <span className="font-mono font-bold text-slate-800 leading-none truncate">{code}</span>
-                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{idx === 0 ? 'Contenedor Principal' : 'Paquete Agrupado'}</span>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                              {idx === 0 ? 'Contenedor Principal' : 'Paquete Vinculado'}
+                            </span>
                           </>
                         )}
                     </div>

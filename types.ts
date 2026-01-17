@@ -74,6 +74,14 @@ export interface ScanRecord {
   cp_proveedorNum?: string;
 }
 
+// Nueva interfaz para datos descargados del Excel
+export interface MasterRecord {
+  code: string;       // El código (HU o Proveedor)
+  store: string;      // En qué tienda está (98, 99...)
+  sheetRow: number;   // Fila en el Excel (para actualizar rápido)
+  originalDate: string; // Fecha de entrada
+}
+
 export const STORE_NAMES: Record<string, string> = {
   '98': 'Tacubaya',
   '185': '185',
