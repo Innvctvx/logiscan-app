@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Truck, Shield, Hash, Building2 } from 'lucide-react';
 import { ServiceType, Region, STORES, STORE_NAMES, CatalogData } from '../types';
+import { playErrorSound } from '../services/soundService';
 
 interface CartaPorteFormProps {
   rfcOperador: string; setRfcOperador: (v: string) => void;
@@ -56,7 +57,11 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
     const val = e.target.value;
     setOperadorName(val);
     const found = catalogs.drivers.find(d => d.name.toUpperCase() === val.toUpperCase());
-    if (found) { rfcOperador === '' && setRfcOperador(found.rfc); licencia === '' && setLicencia(found.license); }
+    if (found) { 
+      // Autorellenado forzoso para asegurar consistencia
+      setRfcOperador(found.rfc); 
+      setLicencia(found.license); 
+    }
   };
 
   const handleUnitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,9 +69,22 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
     setNumEconomico(val);
     const found = catalogs.units.find(u => u.eco.toString() === val.toString());
     if (found) {
-      setConfVehic(found.conf); setPlaca(found.placa); setAno(found.year);
-      setPoliza(found.policy); setSeguro(found.insurance); setPeso(found.weight);
+      setConfVehic(found.conf); 
+      setPlaca(found.placa); 
+      setAno(found.year);
+      setPoliza(found.policy); 
+      setSeguro(found.insurance); 
+      setPeso(found.weight);
     }
+  };
+
+  const validateAndSave = (storeNum: string) => {
+    if (!rfcOperador || !operadorName || !placa) {
+       playErrorSound();
+       alert("⚠️ FALTAN DATOS OBLIGATORIOS\n\n- Nombre del Operador\n- RFC\n- Placa del Vehículo\n\nPor favor rellénalos antes de guardar.");
+       return;
+    }
+    onSave(storeNum);
   };
 
   return (
@@ -76,11 +94,11 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
           <User className="w-5 h-5 text-amber-500" /> Datos del Operador
         </h3>
         <div className="space-y-4">
-          <input list="drivers-list" type="text" value={operadorName} onChange={handleDriverChange} className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-sm uppercase font-bold" placeholder="Nombre Operador" />
+          <input list="drivers-list" type="text" value={operadorName} onChange={handleDriverChange} className="w-full p-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm uppercase font-bold placeholder:text-slate-400" placeholder="Nombre Operador" />
           <datalist id="drivers-list">{catalogs.drivers.map((d, i) => <option key={i} value={d.name} />)}</datalist>
           <div className="grid grid-cols-2 gap-4">
-            <input type="text" value={rfcOperador} onChange={e => setRfcOperador(e.target.value)} className="w-full p-2.5 border rounded-lg text-sm uppercase" placeholder="RFC" />
-            <input type="text" value={licencia} onChange={e => setLicencia(e.target.value)} className="w-full p-2.5 border rounded-lg text-sm" placeholder="Licencia" />
+            <input type="text" value={rfcOperador} onChange={e => setRfcOperador(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border rounded-lg text-sm uppercase placeholder:text-slate-400" placeholder="RFC" />
+            <input type="text" value={licencia} onChange={e => setLicencia(e.target.value)} className="w-full p-2.5 bg-white text-slate-900 border rounded-lg text-sm placeholder:text-slate-400" placeholder="Licencia" />
           </div>
         </div>
       </div>
@@ -90,18 +108,18 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
           <Truck className="w-5 h-5 text-amber-500" /> Datos del Vehículo
         </h3>
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <input list="units-list" type="text" value={numEconomico} onChange={handleUnitChange} className="w-full p-2.5 border rounded-lg text-sm" placeholder="No. Económico" />
+          <input list="units-list" type="text" value={numEconomico} onChange={handleUnitChange} className="w-full p-2.5 bg-white text-slate-900 border rounded-lg text-sm placeholder:text-slate-400" placeholder="No. Económico" />
           <datalist id="units-list">{catalogs.units.map((u, i) => <option key={i} value={u.eco} />)}</datalist>
-          <input type="text" value={placa} onChange={e => setPlaca(e.target.value)} className="w-full p-2.5 border border-amber-200 bg-amber-50 rounded-lg text-sm uppercase font-bold text-amber-900" placeholder="PLACA" />
+          <input type="text" value={placa} onChange={e => setPlaca(e.target.value)} className="w-full p-2.5 border border-amber-200 bg-amber-50 text-amber-900 rounded-lg text-sm uppercase font-bold placeholder:text-amber-400" placeholder="PLACA" />
         </div>
         <div className="grid grid-cols-3 gap-2 mb-4">
-           <input type="text" value={confVehic} onChange={e => setConfVehic(e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" placeholder="Conf" />
-           <input type="text" value={ano} onChange={e => setAno(e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" placeholder="Año" />
-           <input type="text" value={peso} onChange={e => setPeso(e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" placeholder="Peso" />
+           <input type="text" value={confVehic} onChange={e => setConfVehic(e.target.value)} className="w-full p-2 bg-slate-50 text-slate-900 border rounded text-xs placeholder:text-slate-400" placeholder="Conf" />
+           <input type="text" value={ano} onChange={e => setAno(e.target.value)} className="w-full p-2 bg-slate-50 text-slate-900 border rounded text-xs placeholder:text-slate-400" placeholder="Año" />
+           <input type="text" value={peso} onChange={e => setPeso(e.target.value)} className="w-full p-2 bg-slate-50 text-slate-900 border rounded text-xs placeholder:text-slate-400" placeholder="Peso" />
         </div>
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 grid grid-cols-2 gap-3">
-          <input type="text" value={seguro} onChange={e => setSeguro(e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-xs" placeholder="Aseguradora" />
-          <input type="text" value={poliza} onChange={e => setPoliza(e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded text-xs" placeholder="Num Póliza" />
+          <input type="text" value={seguro} onChange={e => setSeguro(e.target.value)} className="w-full p-2 bg-white text-slate-900 border border-slate-200 rounded text-xs placeholder:text-slate-400" placeholder="Aseguradora" />
+          <input type="text" value={poliza} onChange={e => setPoliza(e.target.value)} className="w-full p-2 bg-white text-slate-900 border border-slate-200 rounded text-xs placeholder:text-slate-400" placeholder="Num Póliza" />
         </div>
       </div>
 
@@ -114,8 +132,8 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
            <button onClick={() => handleProviderSelect('EASO')} className={`flex-1 py-2 text-xs font-bold border rounded ${distribuidora === 'EASO' ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-slate-200'}`}>EASO</button>
         </div>
         <div className="grid grid-cols-2 gap-3 mb-4">
-           <input type="text" value={distribuidora} onChange={e => setDistribuidora(e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" placeholder="Distribuidora" />
-           <input type="text" value={proveedorNum} onChange={e => setProveedorNum(e.target.value)} className="w-full p-2 bg-slate-50 border rounded text-xs" placeholder="Proveedor ID" />
+           <input type="text" value={distribuidora} onChange={e => setDistribuidora(e.target.value)} className="w-full p-2 bg-slate-50 text-slate-900 border rounded text-xs placeholder:text-slate-400" placeholder="Distribuidora" />
+           <input type="text" value={proveedorNum} onChange={e => setProveedorNum(e.target.value)} className="w-full p-2 bg-slate-50 text-slate-900 border rounded text-xs placeholder:text-slate-400" placeholder="Proveedor ID" />
         </div>
       </div>
 
@@ -126,7 +144,7 @@ export const CartaPorteForm: React.FC<CartaPorteFormProps> = ({
         </div>
         <div className="grid grid-cols-2 gap-4">
           {availableStores.map((num) => (
-            <button key={num} onClick={() => onSave(num)} className="bg-slate-900 text-white py-4 rounded-xl shadow-md active:scale-95 transition-transform flex flex-col items-center group">
+            <button key={num} onClick={() => validateAndSave(num)} className="bg-slate-900 text-white py-4 rounded-xl shadow-md active:scale-95 transition-transform flex flex-col items-center group">
               <span className="text-[10px] uppercase opacity-60 font-bold mb-1">{STORE_NAMES[num]}</span>
               <span className="font-black text-xl">GUARDAR {num}</span>
             </button>

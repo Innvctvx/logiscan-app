@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { ScanRecord, STORE_NAMES, ServiceType } from '../types';
-import { FileSpreadsheet, CheckCircle2, CloudUpload, Loader2, Download, Box, Truck, User, Trash2, Pencil, X, Save } from 'lucide-react';
+import { FileSpreadsheet, CloudUpload, Loader2, Download, Box, Truck, User, Trash2, Pencil, X, Save } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface HistoryTableProps {
@@ -12,21 +11,38 @@ interface HistoryTableProps {
   onSyncSuccess?: () => void;
   onDeleteRecord?: (id: string) => void;
   onUpdateRecord?: (updated: ScanRecord) => void;
+  onClearMemory?: () => void; // Nuevo prop para borrar manualmente
 }
 
 type ViewFilter = 'ALL' | 'SCAN' | 'CARTA_PORTE';
+
+// --- DEFINICIÓN DE ENCABEZADOS ---
+const SCAN_HEADERS = [
+  "CONSECUTIVO", "TIPO DOC", "NUM DOC", "REF", "BULTOS", "TIENDA", "DESTINO", 
+  "CONTENIDO (LP/HU)", "TIPO", "CONTENEDOR/PROV", "FECHA ESCANEO", "ESTATUS", 
+  "FECHA VERIFICACION", "CHOFER SALIDA", "PLACA/ECO SALIDA", "SELLO SALIDA", 
+  "ESCANEO POR", "VERIFICADO POR"
+];
+
+const CP_HEADERS = [
+  "ID", "DESTINO", "OPERADOR", "RFC", "LICENCIA", "PLACA 1", "ECO", "CONFIG", 
+  "AÑO", "POLIZA", "SEGURO", "PESO", "DISTRIBUIDORA", "PROV ID", 
+  "FECHA ENT", "HORA ENT", "FECHA SAL", "HORA SAL", 
+  "CARGADO 1", "% CARGA 1", "SELLO 1", 
+  "PLACA 2", "CARGADO 2", "% CARGA 2", "SELLO 2", 
+  "TIMESTAMP", "USUARIO"
+];
 
 export const HistoryTable: React.FC<HistoryTableProps> = ({ 
   records, 
   masterSheetId, 
   onSyncSuccess, 
   onDeleteRecord, 
-  onUpdateRecord 
+  onUpdateRecord,
+  onClearMemory
 }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [viewFilter, setViewFilter] = useState<ViewFilter>('ALL');
-  
-  // State for Editing Modal
   const [editingRecord, setEditingRecord] = useState<ScanRecord | null>(null);
 
   const isScriptMode = masterSheetId && masterSheetId.startsWith('https://');
@@ -39,19 +55,26 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
   };
 
   const handleSyncToGoogle = async () => {
-    if (records.length === 0) return;
+    if (records.length === 0) return alert("⚠️ No hay registros para sincronizar.");
+    if (!isScriptMode) return alert("⚠️ URL del Script no configurada. Ve a Configuración.");
+
     setIsSyncing(true);
 
     try {
-      const groupedData: Record<string, any[]> = {};
+      // Estructura: { "NombreHoja": { headers: [...], rows: [...] } }
+      const groupedData: Record<string, { headers: string[], rows: any[] }> = {};
       const storeCounters: Record<string, number> = {};
       let cpCounter = 1; 
       
       records.forEach(r => {
         if (r.recordCategory === 'CARTA_PORTE') {
            const tabName = 'CARTA PORTE'; 
-           if (!groupedData[tabName]) groupedData[tabName] = [];
-           groupedData[tabName].push([
+           
+           if (!groupedData[tabName]) {
+             groupedData[tabName] = { headers: CP_HEADERS, rows: [] };
+           }
+
+           groupedData[tabName].rows.push([
              cpCounter++, r.storeLabel, r.cp_operador || '', r.cp_rfcOperador || '', 
              r.cp_licencia || '', r.cp_placa || '', r.cp_numEconomico || '', r.cp_confVehic || '', 
              r.cp_ano || '', r.cp_poliza || '', r.cp_seguro || '', r.cp_peso || '', 
@@ -61,17 +84,24 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
              r.cp_placa2 || '-', r.cp_isLoaded2 || 'NO', r.cp_loadPercent2 || '0%', r.cp_exitSeal2 || '-',
              formatDateTime(r.timestamp), r.scannerName || ''
            ]);
+
         } else {
+          // Lógica para pestañas por tienda (ej: "98 Tacubaya")
           const match = r.storeLabel.match(/(\d+)/);
           const storeNum = match ? match[0] : 'General';
           const storeName = STORE_NAMES[storeNum] || '';
           const tabName = `${storeNum} ${storeName}`.trim();
-          if (!groupedData[tabName]) groupedData[tabName] = [];
+          
+          if (!groupedData[tabName]) {
+            groupedData[tabName] = { headers: SCAN_HEADERS, rows: [] };
+          }
+          
           if (!storeCounters[tabName]) storeCounters[tabName] = 1;
           const consecutivo = storeCounters[tabName]++;
 
-          groupedData[tabName].push([
-            consecutivo, r.docType || '', r.docNumber, '', r.bultos, r.storeLabel, 'PAQUETERÍA', r.huCode, '', r.providerCode,
+          groupedData[tabName].rows.push([
+            consecutivo, r.docType || '', r.docNumber, '', r.bultos, r.storeLabel, 'PAQUETERÍA', 
+            r.huCode, '', r.providerCode,
             formatDateTime(r.timestamp), r.status, r.verifiedAt ? formatDateTime(r.verifiedAt) : '',
             r.departureDriver || '', r.departureTrailer || '', r.departureSeal || '',
             r.scannerName || '', r.verifierName || ''
@@ -79,24 +109,30 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
         }
       });
 
-      if (isScriptMode) {
-        const response = await fetch(masterSheetId, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'sync', sheets: groupedData })
-        });
-        const resJson = await response.json();
-        if (resJson.result === 'success') {
-          alert("✅ Sincronización Exitosa");
-          if (onSyncSuccess) onSyncSuccess();
-        } else {
-          alert("❌ Error en script de Google");
-        }
+      const payload = { action: 'sync', sheets: groupedData };
+      console.log("Enviando payload con encabezados:", payload);
+
+      const response = await fetch(masterSheetId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      
+      const resJson = await response.json();
+      
+      if (resJson.result === 'success') {
+        alert("✅ ¡Sincronización Exitosa! Datos subidos.\n\nNOTA: Los registros se mantienen en memoria por si necesitas verificarlos. Usa el botón 'LIMPIAR' cuando termines.");
+        if (onSyncSuccess) onSyncSuccess();
       } else {
-        alert("⚠️ Configura la URL del Script");
+        if (resJson.error === "Acción desconocida" || resJson.error === "Action unknown") {
+            alert("⚠️ ERROR DE VERSIÓN: El Script de Google NO reconoce el formato nuevo.\n\nSOLUCIÓN: Actualiza el código en Apps Script y dale a 'Implementar > Nueva versión'.");
+        } else {
+            alert("❌ Error del servidor: " + (resJson.error || "Error desconocido."));
+        }
       }
     } catch (error) {
-      alert("❌ Error de red");
+      console.error(error);
+      alert("❌ Error de conexión. Revisa tu internet o la URL del script.");
     } finally {
       setIsSyncing(false);
     }
@@ -133,7 +169,16 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
           <div className="flex gap-2">
             {records.length > 0 && (
               <>
-                <button onClick={handleSyncToGoogle} disabled={isSyncing} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black text-white ${isScriptMode ? 'bg-violet-600 shadow-md' : 'bg-slate-700'}`}>
+                {/* Botón de Borrado Manual */}
+                {onClearMemory && (
+                  <button 
+                    onClick={onClearMemory} 
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black text-red-600 bg-red-100 hover:bg-red-200 transition-all active:scale-95"
+                  >
+                    <Trash2 className="w-3 h-3" /> LIMPIAR
+                  </button>
+                )}
+                <button onClick={handleSyncToGoogle} disabled={isSyncing} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black text-white transition-all active:scale-95 ${isScriptMode ? 'bg-violet-600 hover:bg-violet-700 shadow-md' : 'bg-slate-400 cursor-not-allowed'}`}>
                   {isSyncing ? <Loader2 className="animate-spin w-3 h-3" /> : <CloudUpload className="w-3 h-3" />}
                   SUBIR A DRIVE
                 </button>
@@ -143,9 +188,9 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
           </div>
         </div>
         <div className="flex p-1 bg-slate-200/50 rounded-lg w-fit">
-          <button onClick={() => setViewFilter('ALL')} className={`px-4 py-1 text-[10px] font-bold rounded-md ${viewFilter === 'ALL' ? 'bg-white shadow-sm' : 'text-slate-500'}`}>TODOS ({records.length})</button>
-          <button onClick={() => setViewFilter('SCAN')} className={`px-4 py-1 text-[10px] font-bold rounded-md ${viewFilter === 'SCAN' ? 'bg-white shadow-sm text-violet-700' : 'text-slate-500'}`}>ESCANEOS</button>
-          <button onClick={() => setViewFilter('CARTA_PORTE')} className={`px-4 py-1 text-[10px] font-bold rounded-md ${viewFilter === 'CARTA_PORTE' ? 'bg-amber-700 text-white' : 'text-slate-500'}`}>CARTA PORTE</button>
+          <button onClick={() => setViewFilter('ALL')} className={`px-4 py-1 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'ALL' ? 'bg-white shadow-sm' : 'text-slate-500'}`}>TODOS ({records.length})</button>
+          <button onClick={() => setViewFilter('SCAN')} className={`px-4 py-1 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'SCAN' ? 'bg-white shadow-sm text-violet-700' : 'text-slate-500'}`}>ESCANEOS</button>
+          <button onClick={() => setViewFilter('CARTA_PORTE')} className={`px-4 py-1 text-[10px] font-bold rounded-md transition-all ${viewFilter === 'CARTA_PORTE' ? 'bg-amber-700 text-white' : 'text-slate-500'}`}>CARTA PORTE</button>
         </div>
       </div>
       
@@ -162,18 +207,23 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
           </thead>
           <tbody className="divide-y">
             {records.length === 0 ? (
-              <tr><td colSpan={5} className="py-12 text-center text-slate-300 font-medium">No hay registros pendientes.</td></tr>
+              <tr>
+                <td colSpan={5} className="py-12 text-center text-slate-300 font-medium flex flex-col items-center justify-center gap-2">
+                  <Box className="w-8 h-8 opacity-20" />
+                  No hay registros pendientes.
+                </td>
+              </tr>
             ) : filteredRecords.map((r) => (
-              <tr key={r.id} className={`hover:bg-slate-50 group ${r.status === 'VERIFICADO' ? 'border-l-4 border-emerald-500 bg-emerald-50/20' : ''}`}>
+              <tr key={r.id} className={`hover:bg-slate-50 group transition-colors ${r.status === 'VERIFICADO' ? 'border-l-4 border-emerald-500 bg-emerald-50/20' : ''}`}>
                 <td className="px-3 py-3 text-[9px] font-black">{r.status}</td>
                 <td className="px-3 py-3">{r.recordCategory === 'CARTA_PORTE' ? <Truck className="w-3 h-3 text-amber-500" /> : <Box className="w-3 h-3 text-violet-500" />}</td>
                 <td className="px-3 py-3">
-                  <div className="font-bold text-xs uppercase">{r.recordCategory === 'CARTA_PORTE' ? r.cp_operador : r.storeLabel}</div>
-                  <div className="text-[10px] text-slate-400 font-mono">{r.recordCategory === 'CARTA_PORTE' ? r.cp_placa : r.huCode}</div>
+                  <div className="font-bold text-xs uppercase text-slate-700">{r.recordCategory === 'CARTA_PORTE' ? r.cp_operador : r.storeLabel}</div>
+                  <div className="text-[10px] text-slate-400 font-mono font-bold">{r.recordCategory === 'CARTA_PORTE' ? r.cp_placa : r.huCode}</div>
                 </td>
                 <td className="px-3 py-3 text-[10px] text-slate-500 flex items-center gap-1 font-bold"><User className="w-3 h-3" />{r.scannerName}</td>
                 <td className="px-3 py-3 text-right">
-                   <div className="flex justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                   <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={(e) => { e.stopPropagation(); setEditingRecord(r); }}
                         className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
@@ -213,9 +263,8 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                  <select 
                     value={editingRecord.storeLabel} 
                     onChange={e => setEditingRecord({...editingRecord, storeLabel: e.target.value})}
-                    className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold uppercase bg-white focus:ring-2 focus:ring-violet-500 outline-none transition-all"
+                    className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold uppercase bg-white text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none transition-all"
                  >
-                    {/* Generar todas las opciones posibles de tiendas y servicios */}
                     {Object.entries(STORE_NAMES).map(([num, name]) => (
                       <React.Fragment key={num}>
                         <option value={`${ServiceType.CC} ${num}`}>{`${ServiceType.CC} ${num} - ${name}`}</option>
@@ -233,7 +282,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                       type="text" 
                       value={editingRecord.huCode} 
                       onChange={e => setEditingRecord({...editingRecord, huCode: e.target.value.toUpperCase()})}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-mono font-bold uppercase focus:ring-2 focus:ring-violet-500 outline-none"
+                      className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-mono font-bold uppercase bg-white text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none"
                     />
                    </div>
                    <div>
@@ -242,7 +291,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                       type="text" 
                       value={editingRecord.providerCode} 
                       onChange={e => setEditingRecord({...editingRecord, providerCode: e.target.value.toUpperCase()})}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-mono font-bold uppercase focus:ring-2 focus:ring-violet-500 outline-none"
+                      className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-mono font-bold uppercase bg-white text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none"
                     />
                    </div>
                  </>
@@ -255,7 +304,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                           type="text" 
                           value={editingRecord.cp_operador} 
                           onChange={e => setEditingRecord({...editingRecord, cp_operador: e.target.value.toUpperCase()})}
-                          className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold uppercase focus:ring-2 focus:ring-violet-500 outline-none"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold uppercase bg-white text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none"
                         />
                       </div>
                       <div>
@@ -264,7 +313,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                           type="text" 
                           value={editingRecord.cp_placa} 
                           onChange={e => setEditingRecord({...editingRecord, cp_placa: e.target.value.toUpperCase()})}
-                          className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold uppercase focus:ring-2 focus:ring-violet-500 outline-none"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold uppercase bg-white text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none"
                         />
                       </div>
                    </div>
@@ -275,7 +324,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                           type="text" 
                           value={editingRecord.cp_placa2} 
                           onChange={e => setEditingRecord({...editingRecord, cp_placa2: e.target.value.toUpperCase()})}
-                          className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold uppercase focus:ring-2 focus:ring-violet-500 outline-none"
+                          className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold uppercase bg-white text-slate-900 focus:ring-2 focus:ring-violet-500 outline-none"
                         />
                       </div>
                    )}
