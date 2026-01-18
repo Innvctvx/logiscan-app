@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LogiScan">
+    
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/679/679720.png">
+
+    <title>LogiScan Grouper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        overscroll-behavior-y: contain; /* Prevents pull-to-refresh on mobile */
+      }
+      
+      /* --- Scanner UI Customization --- */
+      
+      /* Hide the borders and default background of the reader */
+      #reader {
+        border: none !important;
+        width: 100% !important;
+      }
+      
+      /* Hide the large default "Phone" icon/illustration to save space */
+      #reader img[alt="Info icon"] {
+        display: none !important;
+      }
+      
+      /* Hide the "Powered by..." text */
+      #reader div[style*="opacity: 0.8"] {
+        display: none !important;
+      }
+
+      /* CRITICAL FIX: Force ALL text inside the reader dashboard to be white 
+         This fixes the dark-blue-on-black issue for permission links */
+      #reader__dashboard_section_csr span, 
+      #reader__dashboard_section_csr a,
+      #reader__dashboard_section_swaplink {
+        color: white !important;
+        text-decoration: none !important;
+      }
+
+      /* Specific style for the permission button to make it pop */
+      #reader__dashboard_section_csr a {
+        display: inline-block;
+        background-color: #2563eb; /* blue-600 */
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(255,255,255,0.2);
+      }
+
+      /* Ensure select dropdowns are still readable (Black text on White bg) */
+      #reader select {
+        color: black !important;
+        background-color: white !important;
+        padding: 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        width: 100%;
+        max-width: 300px;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "html5-qrcode": "https://esm.sh/html5-qrcode@2.3.8",
+    "xlsx": "https://esm.sh/xlsx@0.18.5"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

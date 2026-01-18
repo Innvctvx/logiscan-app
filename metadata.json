@@ -1,0 +1,7 @@
+{
+  "name": "LogiScan Grouper",
+  "description": "A scanning and grouping system for logistics, categorizing scans by location (Tacubaya, Tultitlán, Plan N5) and service type (C&C, Domicilio).",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
